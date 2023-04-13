@@ -221,7 +221,7 @@ export class ApRendererService {
 		requestId?: string,
 	): IFollow {
 		return {
-			id: requestId ?? `${this.config.url}/follows/${follower.id}/${followee.id}`,
+			id: requestId,
 			type: 'Follow',
 			actor: this.userEntityService.isLocalUser(follower) ? `${this.config.url}/users/${follower.id}` : follower.uri!,
 			object: this.userEntityService.isLocalUser(followee) ? `${this.config.url}/users/${followee.id}` : followee.uri!,
