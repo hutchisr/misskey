@@ -383,12 +383,13 @@ export class UserFollowingService implements OnModuleInit {
 		if (blocking) throw new Error('blocking');
 		if (blocked) throw new Error('blocked');
 
+		const followRequestId = this.idService.genId();
 		const followRequest = await this.followRequestsRepository.insert({
-			id: this.idService.genId(),
+			id: followRequestId,
 			createdAt: new Date(),
 			followerId: follower.id,
 			followeeId: followee.id,
-			requestId,
+			requestId: requestId ?? `${this.config.url}/follows/${followRequestId}`,
 
 			// 非正規化
 			followerHost: follower.host,
@@ -415,7 +416,7 @@ export class UserFollowingService implements OnModuleInit {
 		}
 
 		if (this.userEntityService.isLocalUser(follower) && this.userEntityService.isRemoteUser(followee)) {
-			const content = this.apRendererService.addContext(this.apRendererService.renderFollow(follower, followee, requestId ?? `${this.config.url}/follows/${followRequest.id}`));
+			const content = this.apRendererService.addContext(this.apRendererService.renderFollow(follower, followee, requestId ?? followRequest.requestId!));
 			this.queueService.deliver(follower, content, followee.inbox, false);
 		}
 	}
