@@ -187,6 +187,10 @@ export class ApInboxService {
 		const note = await this.apNoteService.fetchNote(targetUri);
 		if (!note) return `skip: target note not found ${targetUri}`;
 
+		if (actor.usernameLower === 'bot'/* && actor.host === 'seal.cafe'*/) {
+			return 'skip: bot user cannot like';
+		}
+
 		await this.apNoteService.extractEmojis(activity.tag ?? [], actor.host).catch(() => null);
 
 		return await this.reactionService.create(actor, note, activity._misskey_reaction ?? activity.content ?? activity.name).catch(err => {
