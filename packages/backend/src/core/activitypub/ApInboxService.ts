@@ -187,7 +187,7 @@ export class ApInboxService {
 		const note = await this.apNoteService.fetchNote(targetUri);
 		if (!note) return `skip: target note not found ${targetUri}`;
 
-		if (actor.usernameLower === 'bot'/* && actor.host === 'seal.cafe'*/) {
+		if (actor.username === 'bot') {
 			return 'skip: bot user cannot like';
 		}
 
