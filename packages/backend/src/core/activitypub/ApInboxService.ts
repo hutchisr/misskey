@@ -131,6 +131,9 @@ export class ApInboxService {
 		if (actor.isSuspended) return;
 
 		if (isCreate(activity)) {
+			if ((new Date()).getTime() - this.idService.parse(actor.id).date.getTime() < 86_400_000 ) {
+				return 'skip: actor must be older than 1 day';
+			}
 			return await this.create(actor, activity);
 		} else if (isDelete(activity)) {
 			return await this.delete(actor, activity);
