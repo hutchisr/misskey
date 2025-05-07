@@ -12,8 +12,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 	tabindex="0"
 >
 	<div v-if="appearNote.reply && appearNote.reply.replyId">
-		<div v-if="!conversationLoaded" style="padding: 16px">
-			<MkButton style="margin: 0 auto;" primary rounded @click="loadConversation">{{ i18n.ts.loadConversation }}</MkButton>
+		<div v-if="conversationLoading" style="padding: 16px">
+			<MkLoading/>
 		</div>
 		<MkNoteSub v-for="note in conversation" :key="note.id" :class="$style.replyToMore" :note="note"/>
 	</div>
@@ -43,7 +43,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<span v-if="note.localOnly" style="margin-left: 0.5em;" :title="i18n.ts._visibility['disableFederation']"><i class="ti ti-rocket-off"></i></span>
 		</div>
 	</div>
-	<article :class="$style.note" @contextmenu.stop="onContextmenu">
+	<article ref="noteEl" :class="$style.note" @contextmenu.stop="onContextmenu">
 		<header :class="$style.noteHeader">
 			<MkAvatar :class="$style.noteHeaderAvatar" :user="appearNote.user" indicator link preview/>
 			<div :class="$style.noteHeaderBody">
@@ -181,8 +181,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div>
 		<div v-if="tab === 'replies'">
-			<div v-if="!repliesLoaded" style="padding: 16px">
-				<MkButton style="margin: 0 auto;" primary rounded @click="loadReplies">{{ i18n.ts.loadReplies }}</MkButton>
+			<div v-if="repliesLoading" style="padding: 16px">
+				<MkLoading/>
 			</div>
 			<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true"/>
 		</div>
@@ -228,7 +228,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, inject, markRaw, onMounted, provide, ref, useTemplateRef } from 'vue';
+import { computed, inject, markRaw, nextTick, onMounted, provide, ref, useTemplateRef, watch } from 'vue';
 import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
 import { isLink } from '@@/js/is-link.js';
@@ -309,6 +309,7 @@ const { $note: $appearNote, subscribe: subscribeManuallyToNoteCapture } = useNot
 });
 
 const rootEl = useTemplateRef('rootEl');
+const noteEl = useTemplateRef('noteEl');
 const menuButton = useTemplateRef('menuButton');
 const renoteButton = useTemplateRef('renoteButton');
 const renoteTime = useTemplateRef('renoteTime');
@@ -457,6 +458,14 @@ function reply(): void {
 		channel: appearNote.channel,
 	}).then(() => {
 		focus();
+		// Reload replies when the user makes a reply
+		if (tab.value === 'replies') {
+			// Reset the replies state
+			repliesLoaded.value = false;
+			replies.value = [];
+			// Load the replies again
+			loadReplies();
+		}
 	});
 }
 
@@ -585,28 +594,83 @@ function blur() {
 }
 
 const repliesLoaded = ref(false);
+const repliesLoading = ref(false);
 
 function loadReplies() {
-	repliesLoaded.value = true;
+	if (repliesLoaded.value) return;
+
+	repliesLoading.value = true;
 	misskeyApi('notes/children', {
 		noteId: appearNote.id,
 		limit: 30,
 	}).then(res => {
 		replies.value = res;
+		repliesLoaded.value = true;
+	}).finally(() => {
+		repliesLoading.value = false;
 	});
 }
 
+// Automatically load replies when the component is mounted or when the tab changes to 'replies'
+onMounted(() => {
+	if (tab.value === 'replies') {
+		loadReplies();
+	}
+});
+
+watch(tab, (newTab) => {
+	if (newTab === 'replies' && !repliesLoaded.value) {
+		loadReplies();
+	}
+});
+
 const conversationLoaded = ref(false);
+const conversationLoading = ref(false);
 
 function loadConversation() {
+	if (conversationLoaded.value) return;
+
+	conversationLoading.value = true;
 	conversationLoaded.value = true;
-	if (appearNote.replyId == null) return;
+	if (appearNote.replyId == null) {
+		conversationLoading.value = false;
+		return;
+	}
+
 	misskeyApi('notes/conversation', {
 		noteId: appearNote.replyId,
 	}).then(res => {
 		conversation.value = res.reverse();
+		// Wait for the DOM to update with the conversation
+		nextTick(() => {
+			// Scroll to the main note after conversation is loaded
+			if (noteEl.value) {
+				noteEl.value.scrollIntoView({ behavior: 'instant', block: 'start' });
+			}
+		});
+	}).finally(() => {
+		conversationLoading.value = false;
 	});
 }
+
+// Automatically load conversation when the component is mounted
+onMounted(() => {
+	if (appearNote.value.reply && appearNote.value.reply.replyId) {
+		// If conversation is already loaded (e.g., when revisiting the page)
+		if (conversationLoaded.value && conversation.value.length > 0) {
+			// Wait for the DOM to be fully rendered
+			nextTick(() => {
+				// Scroll to the main note
+				if (noteEl.value) {
+					noteEl.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			});
+		} else {
+			// Otherwise load the conversation (which will handle scrolling)
+			loadConversation();
+		}
+	}
+});
 </script>
 
 <style lang="scss" module>
