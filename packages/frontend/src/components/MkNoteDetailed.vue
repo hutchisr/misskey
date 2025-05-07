@@ -12,8 +12,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 	tabindex="0"
 >
 	<div v-if="appearNote.reply && appearNote.reply.replyId">
-		<div v-if="!conversationLoaded" style="padding: 16px">
-			<MkButton style="margin: 0 auto;" primary rounded @click="loadConversation">{{ i18n.ts.loadConversation }}</MkButton>
+		<div v-if="conversationLoading" style="padding: 16px">
+			<MkLoading/>
 		</div>
 		<MkNoteSub v-for="note in conversation" :key="note.id" :class="$style.replyToMore" :note="note"/>
 	</div>
@@ -47,7 +47,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		{{ i18n.ts.deletedNote }}
 	</div>
 	<template v-else>
-		<article :class="$style.note" @contextmenu.stop="onContextmenu">
+		<article ref="noteEl" :class="$style.note" @contextmenu.stop="onContextmenu">
 			<header :class="$style.noteHeader">
 				<MkAvatar :class="$style.noteHeaderAvatar" :user="appearNote.user" indicator link preview/>
 				<div :class="$style.noteHeaderBody">
@@ -191,8 +191,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 		<div>
 			<div v-if="tab === 'replies'">
-				<div v-if="!repliesLoaded" style="padding: 16px">
-					<MkButton style="margin: 0 auto;" primary rounded @click="loadReplies">{{ i18n.ts.loadReplies }}</MkButton>
+				<div v-if="repliesLoading" style="padding: 16px">
+					<MkLoading/>
 				</div>
 				<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true"/>
 			</div>
@@ -239,7 +239,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { inject, provide, ref, useTemplateRef, markRaw, computed } from 'vue';
+import { computed, inject, markRaw, nextTick, onMounted, provide, ref, useTemplateRef, watch } from 'vue';
 import * as Misskey from 'misskey-js';
 import { useNote } from '@/composables/use-note.js';
 import { prefer } from '@/preferences.js';
@@ -265,7 +265,6 @@ import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 import MkUserCardMini from '@/components/MkUserCardMini.vue';
 import MkPagination from '@/components/MkPagination.vue';
 import MkReactionIcon from '@/components/MkReactionIcon.vue';
-import MkButton from '@/components/MkButton.vue';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -279,6 +278,7 @@ const inChannel = inject(DI.inChannel, null);
 
 // Template Refsの定義
 const rootEl = useTemplateRef('rootEl');
+const noteEl = useTemplateRef('noteEl');
 const menuButton = useTemplateRef('menuButton');
 const renoteButton = useTemplateRef('renoteButton');
 const renoteTime = useTemplateRef('renoteTime');
@@ -350,29 +350,73 @@ const reactionsPaginator = markRaw(new Paginator('notes/reactions', {
 
 const replies = ref<Misskey.entities.Note[]>([]);
 const repliesLoaded = ref(false);
+const repliesLoading = ref(false);
 
 function loadReplies() {
-	repliesLoaded.value = true;
+	if (repliesLoaded.value) return;
+	repliesLoading.value = true;
 	misskeyApi('notes/children', {
 		noteId: appearNote.id,
 		limit: 30,
 	}).then(res => {
 		replies.value = res;
+		repliesLoaded.value = true;
+	}).finally(() => {
+		repliesLoading.value = false;
 	});
 }
 
+onMounted(() => {
+	if (tab.value === 'replies') {
+		loadReplies();
+	}
+});
+
+watch(tab, (newTab) => {
+	if (newTab === 'replies' && !repliesLoaded.value) {
+		loadReplies();
+	}
+});
+
 const conversation = ref<Misskey.entities.Note[]>([]);
 const conversationLoaded = ref(false);
+const conversationLoading = ref(false);
 
 function loadConversation() {
+	if (conversationLoaded.value) return;
+	conversationLoading.value = true;
 	conversationLoaded.value = true;
-	if (appearNote.replyId == null) return;
+	if (appearNote.replyId == null) {
+		conversationLoading.value = false;
+		return;
+	}
 	misskeyApi('notes/conversation', {
 		noteId: appearNote.replyId,
 	}).then(res => {
 		conversation.value = res.reverse();
+		nextTick(() => {
+			if (noteEl.value) {
+				noteEl.value.scrollIntoView({ behavior: 'instant', block: 'start' });
+			}
+		});
+	}).finally(() => {
+		conversationLoading.value = false;
 	});
 }
+
+onMounted(() => {
+	if (appearNote.reply && appearNote.reply.replyId) {
+		if (conversationLoaded.value && conversation.value.length > 0) {
+			nextTick(() => {
+				if (noteEl.value) {
+					noteEl.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			});
+		} else {
+			loadConversation();
+		}
+	}
+});
 
 // キーボードショートカットマップ
 const keymap = {
