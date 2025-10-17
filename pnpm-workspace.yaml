@@ -26,6 +26,7 @@ onlyBuiltDependencies:
   - nice-napi
   - re2
   - sharp
+  - slacc
   - utf-8-validate
   - v-code-diff
   - vue-demi
