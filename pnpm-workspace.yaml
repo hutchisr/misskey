@@ -27,6 +27,7 @@ allowBuilds:
   nice-napi: true
   re2: true
   sharp: true
+  slacc: true
   utf-8-validate: true
   v-code-diff: true
   vue-demi: true

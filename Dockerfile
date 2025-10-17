@@ -1,18 +1,16 @@
 # syntax = docker/dockerfile:1.23
 
-ARG NODE_VERSION=26.4.0-trixie
+ARG NODE_VERSION=22.15.0-alpine
 
 # build assets & compile TypeScript
 
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION} AS native-builder
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-	--mount=type=cache,target=/var/lib/apt,sharing=locked \
-	rm -f /etc/apt/apt.conf.d/docker-clean \
-	; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache \
-	&& apt-get update \
-	&& apt-get install -yqq --no-install-recommends \
-	build-essential
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+	apk add --no-cache \
+	build-base \
+	git \
+	python3
 
 WORKDIR /misskey
 
@@ -48,9 +46,10 @@ RUN rm -rf .git/
 
 FROM --platform=$TARGETPLATFORM node:${NODE_VERSION} AS target-builder
 
-RUN apt-get update \
-	&& apt-get install -yqq --no-install-recommends \
-	build-essential
+RUN apk add --no-cache \
+	build-base \
+	python3 \
+	git
 
 WORKDIR /misskey
 
@@ -67,25 +66,26 @@ ARG NODE_ENV=production
 RUN node -e "console.log(JSON.parse(require('node:fs').readFileSync('./package.json')).packageManager)" | xargs npm install -g
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
-	pnpm i --frozen-lockfile --aggregate-output
+	pnpm install --frozen-lockfile --aggregate-output
 
-FROM --platform=$TARGETPLATFORM node:${NODE_VERSION}-slim AS runner
+FROM --platform=$TARGETPLATFORM node:${NODE_VERSION} AS runner
 
 ARG UID="991"
 ARG GID="991"
 
 ENV PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false
 
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-	ffmpeg tini curl libjemalloc-dev libjemalloc2 \
-	&& ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so \
-	&& groupadd -g "${GID}" misskey \
-	&& useradd -l -u "${UID}" -g "${GID}" -m -d /misskey misskey \
-	&& find / -type d -path /sys -prune -o -type d -path /proc -prune -o -type f -perm /u+s -ignore_readdir_race -exec chmod u-s {} \; \
-	&& find / -type d -path /sys -prune -o -type d -path /proc -prune -o -type f -perm /g+s -ignore_readdir_race -exec chmod g-s {} \; \
-	&& apt-get clean \
-	&& rm -rf /var/lib/apt/lists
+RUN apk add --no-cache \
+	ffmpeg \
+	tini \
+	curl \
+	jemalloc \
+	jemalloc-dev \
+	&& ln -s /usr/lib/libjemalloc.so.2 /usr/local/lib/libjemalloc.so \
+	&& addgroup -g "${GID}" misskey \
+	&& adduser -u "${UID}" -G misskey -D -h /misskey misskey \
+	&& find / -type d -path /sys -prune -o -type d -path /proc -prune -o -type f -perm /u+s -exec chmod u-s {} \; 2>/dev/null || true \
+	&& find / -type d -path /sys -prune -o -type d -path /proc -prune -o -type f -perm /g+s -exec chmod g-s {} \; 2>/dev/null || true
 
 # add package.json to add pnpm
 COPY ./package.json ./package.json
@@ -109,6 +109,6 @@ COPY --chown=misskey:misskey . ./
 
 ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so
 ENV NODE_ENV=production
-HEALTHCHECK --interval=5s --retries=20 CMD ["/bin/bash", "/misskey/healthcheck.sh"]
-ENTRYPOINT ["/usr/bin/tini", "--"]
+HEALTHCHECK --interval=5s --retries=20 CMD ["/bin/sh", "/misskey/healthcheck.sh"]
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["pnpm", "run", "migrateandstart"]
