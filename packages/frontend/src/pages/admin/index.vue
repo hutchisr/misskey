@@ -210,6 +210,11 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		to: '/admin/security',
 		active: currentPage.value?.route.name === 'security',
 	}, {
+		icon: 'ti ti-filter',
+		text: i18n.ts._mrf.title,
+		to: '/admin/mrf',
+		active: currentPage.value?.route.name === 'mrf',
+	}, {
 		icon: 'ti ti-planet',
 		text: i18n.ts.relays,
 		to: '/admin/relays',
