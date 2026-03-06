@@ -228,6 +228,50 @@ export const paramDef = {
 		remoteNotesCleaningExpiryDaysForEachNotes: { type: 'number' },
 		remoteNotesCleaningMaxProcessingDurationInMinutes: { type: 'number' },
 		showRoleBadgesOfRemoteUsers: { type: 'boolean' },
+		mrfPolicies: {
+			type: 'object',
+			nullable: false,
+			properties: {
+				enabled: {
+					type: 'array',
+					items: { type: 'string' },
+				},
+				simple: {
+					type: 'object',
+					properties: {
+						reject: { type: 'array', items: { type: 'string' } },
+						mediaRemoval: { type: 'array', items: { type: 'string' } },
+						mediaNsfw: { type: 'array', items: { type: 'string' } },
+						reportRemoval: { type: 'array', items: { type: 'string' } },
+						followersOnly: { type: 'array', items: { type: 'string' } },
+					},
+				},
+				keyword: {
+					type: 'object',
+					properties: {
+						reject: { type: 'array', items: { type: 'string' } },
+						replace: {
+							type: 'array',
+							items: {
+								type: 'object',
+								properties: {
+									pattern: { type: 'string' },
+									replacement: { type: 'string' },
+								},
+								required: ['pattern', 'replacement'],
+							},
+						},
+					},
+				},
+				hellthread: {
+					type: 'object',
+					properties: {
+						rejectThreshold: { type: 'integer' },
+						delistThreshold: { type: 'integer' },
+					},
+				},
+			},
+		},
 	},
 	required: [],
 } as const;
@@ -790,6 +834,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (ps.showRoleBadgesOfRemoteUsers !== undefined) {
 				set.showRoleBadgesOfRemoteUsers = ps.showRoleBadgesOfRemoteUsers;
+			}
+
+			if (ps.mrfPolicies !== undefined) {
+				set.mrfPolicies = ps.mrfPolicies as any;
 			}
 
 			const before = await this.metaService.fetch(true);

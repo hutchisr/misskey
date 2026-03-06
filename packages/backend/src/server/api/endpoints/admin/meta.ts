@@ -583,6 +583,10 @@ export const meta = {
 					},
 				},
 			},
+			mrfPolicies: {
+				type: 'object',
+				optional: false, nullable: false,
+			},
 			singleUserMode: {
 				type: 'boolean',
 				optional: false, nullable: false,
@@ -769,6 +773,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				urlPreviewUserAgent: instance.urlPreviewUserAgent,
 				urlPreviewSummaryProxyUrl: instance.urlPreviewSummaryProxyUrl,
 				urlPreviewSensitiveList: instance.urlPreviewSensitiveList,
+				mrfPolicies: instance.mrfPolicies,
 				federation: instance.federation,
 				federationHosts: instance.federationHosts,
 				deliverSuspendedSoftware: instance.deliverSuspendedSoftware,

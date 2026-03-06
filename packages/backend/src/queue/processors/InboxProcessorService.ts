@@ -29,6 +29,7 @@ import { CollapsedQueue } from '@/misc/collapsed-queue.js';
 import { MiNote } from '@/models/Note.js';
 import { MiMeta } from '@/models/Meta.js';
 import { DI } from '@/di-symbols.js';
+import { MrfService } from '@/core/mrf/MrfService.js';
 import { QueueLoggerService } from '../QueueLoggerService.js';
 import type { InboxJobData } from '../types.js';
 
@@ -56,6 +57,7 @@ export class InboxProcessorService implements OnApplicationShutdown {
 		private instanceChart: InstanceChart,
 		private apRequestChart: ApRequestChart,
 		private federationChart: FederationChart,
+		private mrfService: MrfService,
 		private queueLoggerService: QueueLoggerService,
 	) {
 		this.logger = this.queueLoggerService.logger.createSubLogger('inbox');
@@ -247,6 +249,13 @@ export class InboxProcessorService implements OnApplicationShutdown {
 
 			this.fetchInstanceMetadataService.fetchInstanceMetadata(i);
 		});
+
+		// MRF filtering (after validation, before processing)
+		const mrfResult = await this.mrfService.filterActivity(activity);
+		if (mrfResult.action === 'reject') {
+			return `MRF rejected: ${mrfResult.reason}`;
+		}
+		activity = mrfResult.activity as IActivity;
 
 		// アクティビティを処理
 		try {

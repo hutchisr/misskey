@@ -151,6 +151,10 @@ import { ApMentionService } from './activitypub/models/ApMentionService.js';
 import { ApNoteService } from './activitypub/models/ApNoteService.js';
 import { ApPersonService } from './activitypub/models/ApPersonService.js';
 import { ApQuestionService } from './activitypub/models/ApQuestionService.js';
+import { MrfService } from './mrf/MrfService.js';
+import { MrfSimplePolicyService } from './mrf/MrfSimplePolicyService.js';
+import { MrfKeywordPolicyService } from './mrf/MrfKeywordPolicyService.js';
+import { MrfHellthreadPolicyService } from './mrf/MrfHellthreadPolicyService.js';
 import { QueueModule } from './QueueModule.js';
 import { QueueService } from './QueueService.js';
 import { LoggerService } from './LoggerService.js';
@@ -287,6 +291,11 @@ const $ReversiGameEntityService: Provider = { provide: 'ReversiGameEntityService
 const $MetaEntityService: Provider = { provide: 'MetaEntityService', useExisting: MetaEntityService };
 const $SystemWebhookEntityService: Provider = { provide: 'SystemWebhookEntityService', useExisting: SystemWebhookEntityService };
 
+const $MrfService: Provider = { provide: 'MrfService', useExisting: MrfService };
+const $MrfSimplePolicyService: Provider = { provide: 'MrfSimplePolicyService', useExisting: MrfSimplePolicyService };
+const $MrfKeywordPolicyService: Provider = { provide: 'MrfKeywordPolicyService', useExisting: MrfKeywordPolicyService };
+const $MrfHellthreadPolicyService: Provider = { provide: 'MrfHellthreadPolicyService', useExisting: MrfHellthreadPolicyService };
+
 const $ApAudienceService: Provider = { provide: 'ApAudienceService', useExisting: ApAudienceService };
 const $ApDbResolverService: Provider = { provide: 'ApDbResolverService', useExisting: ApDbResolverService };
 const $ApDeliverManagerService: Provider = { provide: 'ApDeliverManagerService', useExisting: ApDeliverManagerService };
@@ -313,6 +322,10 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 	],
 	providers: [
 		LoggerService,
+		MrfService,
+		MrfSimplePolicyService,
+		MrfKeywordPolicyService,
+		MrfHellthreadPolicyService,
 		AbuseReportService,
 		AbuseReportNotificationService,
 		AccountMoveService,
@@ -464,6 +477,10 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 
 		//#region 文字列ベースでのinjection用(循環参照対応のため)
 		$LoggerService,
+		$MrfService,
+		$MrfSimplePolicyService,
+		$MrfKeywordPolicyService,
+		$MrfHellthreadPolicyService,
 		$AbuseReportService,
 		$AbuseReportNotificationService,
 		$AccountMoveService,
@@ -615,6 +632,10 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 	exports: [
 		QueueModule,
 		LoggerService,
+		MrfService,
+		MrfSimplePolicyService,
+		MrfKeywordPolicyService,
+		MrfHellthreadPolicyService,
 		AbuseReportService,
 		AbuseReportNotificationService,
 		AccountMoveService,
@@ -765,6 +786,10 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 
 		//#region 文字列ベースでのinjection用(循環参照対応のため)
 		$LoggerService,
+		$MrfService,
+		$MrfSimplePolicyService,
+		$MrfKeywordPolicyService,
+		$MrfHellthreadPolicyService,
 		$AbuseReportService,
 		$AbuseReportNotificationService,
 		$AccountMoveService,
