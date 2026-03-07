@@ -5,3 +5,7 @@
 Claude Code 固有の補助 (skills / agents / slash commands / docs) は `.claude/` 配下にコミット済。個人ローカル設定は `.claude/settings.local.json` に、MCP 認証情報は `.claude/.credentials.json` に置く (いずれも `.gitignore` 済)。
 
 @AGENTS.md
+
+## Environment
+
+This project uses [mise](https://mise.jdx.dev/) to manage tool versions (see `.mise.toml`). Always run commands within the mise environment — use `mise exec -- <command>` or ensure mise is activated in your shell so the correct Node.js version is used.

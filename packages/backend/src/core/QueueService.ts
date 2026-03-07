@@ -13,6 +13,9 @@ import type { MiSystemWebhook, SystemWebhookEventType } from '@/models/SystemWeb
 import type { Config } from '@/config.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
+import type Logger from '@/logger.js';
+import { LoggerService } from '@/core/LoggerService.js';
+import { MrfService } from '@/core/mrf/MrfService.js';
 import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import { ApRequestCreator } from '@/core/activitypub/ApRequestService.js';
 import { type SystemWebhookPayload } from '@/core/SystemWebhookService.js';
@@ -100,9 +103,14 @@ function parseRedisInfo(infoText: string): Record<string, string> {
 
 @Injectable()
 export class QueueService {
+	private mrfLogger: Logger;
+
 	constructor(
 		@Inject(DI.config)
 		private config: Config,
+
+		private mrfService: MrfService,
+		private loggerService: LoggerService,
 
 		@Inject('queue:system') public systemQueue: SystemQueue,
 		@Inject('queue:endedPollNotification') public endedPollNotificationQueue: EndedPollNotificationQueue,
@@ -133,6 +141,8 @@ export class QueueService {
 			});
 		}
 
+		this.mrfLogger = this.loggerService.getLogger('mrf');
+
 		// 古いバージョンで作成され現在使われなくなったrepeatableジョブをクリーンアップ
 		this.systemQueue.getJobSchedulers().then(schedulers => {
 			for (const scheduler of schedulers) {
@@ -144,9 +154,17 @@ export class QueueService {
 	}
 
 	@bindThis
-	public deliver(user: ThinUser, content: IActivity | null, to: string | null, isSharedInbox: boolean) {
+	public async deliver(user: ThinUser, content: IActivity | null, to: string | null, isSharedInbox: boolean) {
 		if (content == null) return null;
 		if (to == null) return null;
+
+		// Apply MRF filtering to outgoing activities
+		const mrfResult = await this.mrfService.filterActivity(content);
+		if (mrfResult.action === 'reject') {
+			this.mrfLogger.info(`Outgoing activity rejected by MRF: ${mrfResult.reason}`);
+			return null;
+		}
+		content = mrfResult.activity as IActivity;
 
 		const contentBody = JSON.stringify(content);
 		const digest = ApRequestCreator.createDigest(contentBody);
@@ -189,6 +207,15 @@ export class QueueService {
 	@bindThis
 	public async deliverMany(user: ThinUser, content: IActivity | null, inboxes: Map<string, boolean>) {
 		if (content == null) return null;
+
+		// Apply MRF filtering to outgoing activities
+		const mrfResult = await this.mrfService.filterActivity(content);
+		if (mrfResult.action === 'reject') {
+			this.mrfLogger.info(`Outgoing activity rejected by MRF: ${mrfResult.reason}`);
+			return null;
+		}
+		content = mrfResult.activity as IActivity;
+
 		const contentBody = JSON.stringify(content);
 		const digest = ApRequestCreator.createDigest(contentBody);
 

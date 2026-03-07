@@ -11,9 +11,6 @@ import { LoggerService } from '@/core/LoggerService.js';
 import { bindThis } from '@/decorators.js';
 import type { IActivity } from '@/core/activitypub/type.js';
 import type { MrfPolicy, MrfResult } from './types.js';
-import { MrfSimplePolicyService } from './MrfSimplePolicyService.js';
-import { MrfKeywordPolicyService } from './MrfKeywordPolicyService.js';
-import { MrfHellthreadPolicyService } from './MrfHellthreadPolicyService.js';
 
 @Injectable()
 export class MrfService {
@@ -24,17 +21,13 @@ export class MrfService {
 		@Inject(DI.meta)
 		private meta: MiMeta,
 
+		@Inject(DI.mrfPolicies)
+		policies: MrfPolicy[],
+
 		private loggerService: LoggerService,
-		private mrfSimplePolicyService: MrfSimplePolicyService,
-		private mrfKeywordPolicyService: MrfKeywordPolicyService,
-		private mrfHellthreadPolicyService: MrfHellthreadPolicyService,
 	) {
 		this.logger = this.loggerService.getLogger('mrf');
-		this.policyMap = new Map<string, MrfPolicy>([
-			['simple', this.mrfSimplePolicyService],
-			['keyword', this.mrfKeywordPolicyService],
-			['hellthread', this.mrfHellthreadPolicyService],
-		]);
+		this.policyMap = new Map(policies.map(p => [p.name, p]));
 	}
 
 	private get enabledPolicies(): string[] {

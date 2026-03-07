@@ -13,6 +13,7 @@ export const DI = {
 	redisForSub: Symbol('redisForSub'),
 	redisForTimelines: Symbol('redisForTimelines'),
 	redisForReactions: Symbol('redisForReactions'),
+	mrfPolicies: Symbol('mrfPolicies'),
 
 	//#region Repositories
 	usersRepository: Symbol('usersRepository'),
