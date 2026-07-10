@@ -1,4 +1,6 @@
 .autogen
+.agents/
+.codex/
 .github
 .travis
 .vscode
@@ -6,6 +8,9 @@
 Dockerfile
 build/
 built/
+packages/*/built/
+packages/*/built-test/
+packages/*/js-built/
 src-js/
 db/
 .devcontainer/compose.yml

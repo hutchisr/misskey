@@ -83,3 +83,5 @@ vite.config.local-dev.ts.timestamp-*
 
 # Affinity
 *.af~lock~
+.agents
+.codex
