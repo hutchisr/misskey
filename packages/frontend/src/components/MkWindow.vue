@@ -128,6 +128,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
+	(ev: 'close'): void;
 	(ev: 'closed'): void;
 }>();
 
@@ -150,7 +151,9 @@ let unResizedWidth = '';
 let unResizedHeight = '';
 
 function close() {
+	if (!showing.value) return;
 	showing.value = false;
+	emit('close');
 }
 
 function onKeydown(evt: KeyboardEvent) {
