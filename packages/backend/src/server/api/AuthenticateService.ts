@@ -68,6 +68,11 @@ export class AuthenticateService implements OnApplicationShutdown {
 				throw new AuthenticationError('invalid signature');
 			}
 
+			if (accessToken.expiresAt != null && accessToken.expiresAt.getTime() <= Date.now()) {
+				await this.accessTokensRepository.delete(accessToken.id);
+				throw new AuthenticationError('token expired');
+			}
+
 			this.accessTokensRepository.update(accessToken.id, {
 				lastUsedAt: new Date(),
 			});

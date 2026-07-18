@@ -36,6 +36,8 @@ import { HashtagService } from './HashtagService.js';
 import { HttpRequestService } from './HttpRequestService.js';
 import { IdService } from './IdService.js';
 import { ImageProcessingService } from './ImageProcessingService.js';
+import { MiniAppManifestService } from './MiniAppManifestService.js';
+import { MiniAppOAuthTokenService } from './MiniAppOAuthTokenService.js';
 import { SystemAccountService } from './SystemAccountService.js';
 import { InternalStorageService } from './InternalStorageService.js';
 import { MetaService } from './MetaService.js';
@@ -335,6 +337,8 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		HttpRequestService,
 		IdService,
 		ImageProcessingService,
+		MiniAppManifestService,
+		MiniAppOAuthTokenService,
 		InternalStorageService,
 		MetaService,
 		MfmService,
@@ -637,6 +641,8 @@ const $ApQuestionService: Provider = { provide: 'ApQuestionService', useExisting
 		HttpRequestService,
 		IdService,
 		ImageProcessingService,
+		MiniAppManifestService,
+		MiniAppOAuthTokenService,
 		InternalStorageService,
 		MetaService,
 		MfmService,

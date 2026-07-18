@@ -5,7 +5,7 @@ declare module '../api.js' {
   export interface APIClient {
     /**
      * No description provided.
-     * 
+	     *
      * **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
      * **Credential required**: *Yes* / **Permission**: *write:admin:abuse-report:notification-recipient*
      */
@@ -17,7 +17,7 @@ declare module '../api.js' {
 
     /**
      * No description provided.
-     * 
+	     *
      * **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
      * **Credential required**: *Yes* / **Permission**: *write:admin:abuse-report:notification-recipient*
      */
@@ -29,7 +29,7 @@ declare module '../api.js' {
 
     /**
      * No description provided.
-     * 
+	     *
      * **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
      * **Credential required**: *Yes* / **Permission**: *read:admin:abuse-report:notification-recipient*
      */
@@ -3605,8 +3605,20 @@ declare module '../api.js' {
     ): Promise<SwitchCaseResponseType<E, P>>;
 
     /**
+     * Resolve and validate a Fediverse Mini Apps V1 manifest for a linked application URL.
+     *
+     * **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+     * **Credential required**: *Yes*
+     */
+    request<E extends 'mini-apps/resolve', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
      * No description provided.
-     * 
+     *
      * **Credential required**: *Yes* / **Permission**: *write:mutes*
      */
     request<E extends 'mute/create', P extends Endpoints[E]['req']>(
@@ -3617,7 +3629,7 @@ declare module '../api.js' {
 
     /**
      * No description provided.
-     * 
+     *
      * **Credential required**: *Yes* / **Permission**: *write:mutes*
      */
     request<E extends 'mute/delete', P extends Endpoints[E]['req']>(
@@ -4854,6 +4866,28 @@ declare module '../api.js' {
     /**
      * No description provided.
      * 
+     * **Credential required**: *Yes* / **Permission**: *identify*
+     */
+    request<E extends 'v1/mini-apps/identity', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * No description provided.
+     *
+     * **Credential required**: *Yes* / **Permission**: *write*
+     */
+    request<E extends 'v1/statuses', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * No description provided.
+     *
      * **Credential required**: *Yes* / **Permission**: *read:admin:emoji*
      */
     request<E extends 'v2/admin/emoji/list', P extends Endpoints[E]['req']>(

@@ -9419,6 +9419,14 @@ export interface Locale extends ILocale {
     };
     "_permissions": {
         /**
+         * ミニアプリがアカウントを識別する
+         */
+        "identify": string;
+        /**
+         * ミニアプリが公開ノートを作成する
+         */
+        "write": string;
+        /**
          * アカウントの情報を見る
          */
         "read:account": string;
@@ -9788,6 +9796,30 @@ export interface Locale extends ILocale {
          * このアプリは次の権限を要求しています
          */
         "permissionAsk": string;
+        /**
+         * この許可は承認後、最大{duration}有効です。設定からいつでも取り消せます。
+         */
+        "authorizationDuration": ParameterizedString<"duration">;
+        /**
+         * {years}年
+         */
+        "authorizationDurationYears": ParameterizedString<"years">;
+        /**
+         * {days}日
+         */
+        "authorizationDurationDays": ParameterizedString<"days">;
+        /**
+         * {hours}時間
+         */
+        "authorizationDurationHours": ParameterizedString<"hours">;
+        /**
+         * {minutes}分
+         */
+        "authorizationDurationMinutes": ParameterizedString<"minutes">;
+        /**
+         * {seconds}秒
+         */
+        "authorizationDurationSeconds": ParameterizedString<"seconds">;
         /**
          * アプリケーションに戻ってやっていってください
          */
@@ -13369,5 +13401,51 @@ export interface Locale extends ILocale {
          * MFM
          */
         "mfm": string;
+    };
+    "_miniApps": {
+        /**
+         * ミニアプリを確認
+         */
+        "check": string;
+        /**
+         * ミニアプリを開く
+         */
+        "open": string;
+        /**
+         * {name} が提供
+         */
+        "publishedBy": ParameterizedString<"name">;
+        /**
+         * 外部でホストされているアプリです。開くとアプリの提供元に接続します。
+         */
+        "externalNotice": string;
+        /**
+         * ミニアプリに接続しています
+         */
+        "connecting": string;
+        /**
+         * ミニアプリを起動できませんでした。
+         */
+        "launchFailed": string;
+        /**
+         * ミニアプリから応答がありませんでした。
+         */
+        "launchTimedOut": string;
+        /**
+         * ミニアプリを起動するにはHTTPS接続が必要です。
+         */
+        "requiresHttps": string;
+        /**
+         * このミニアプリが要求したログイン方法には対応していません。
+         */
+        "authenticationUnsupported": string;
+        /**
+         * {name} へのログインを続けますか？
+         */
+        "authorizationPrompt": ParameterizedString<"name">;
+        /**
+         * ログインを続ける
+         */
+        "authorize": string;
     };
 }

@@ -2957,6 +2957,16 @@ export type paths = {
          */
         post: operations['miauth___gen-token'];
     };
+    '/mini-apps/resolve': {
+        /**
+         * mini-apps/resolve
+         * @description Resolve and validate a Fediverse Mini Apps V1 manifest for a linked application URL.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['mini-apps___resolve'];
+    };
     '/mute/create': {
         /**
          * mute/create
@@ -3977,6 +3987,24 @@ export type paths = {
          *     **Credential required**: *Yes* / **Permission**: *write:account*
          */
         post: operations['users___update-memo'];
+    };
+    '/v1/mini-apps/identity': {
+        /**
+         * v1/mini-apps/identity
+         * @description No description provided.
+         *
+         *     **Credential required**: *Yes* / **Permission**: *identify*
+         */
+        post: operations['v1___mini-apps___identity'];
+    };
+    '/v1/statuses': {
+        /**
+         * v1/statuses
+         * @description No description provided.
+         *
+         *     **Credential required**: *Yes* / **Permission**: *write*
+         */
+        post: operations['v1___statuses'];
     };
     '/v2/admin/emoji/list': {
         /**
@@ -29010,6 +29038,123 @@ export interface operations {
             };
         };
     };
+    'mini-apps___resolve': {
+        requestBody: {
+            content: {
+                'application/json': {
+                    url: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        /** Format: uri */
+                        manifestUrl: string;
+                        /** Format: uri */
+                        appOrigin: string;
+                        /** Format: uri */
+                        launchUrl: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                        manifest: {
+                            /** @enum {string} */
+                            version: '1';
+                            name: string;
+                            publisher: {
+                                name: string;
+                                /** Format: uri */
+                                url: string;
+                            };
+                            /** Format: uri */
+                            homeUrl: string;
+                            /** Format: uri */
+                            iconUrl: string;
+                            splash: {
+                                /** Format: uri */
+                                imageUrl: string;
+                                backgroundColor: string;
+                            };
+                            oauth: {
+                                redirectUris: string[];
+                                scopes: ('identify' | 'write')[];
+                                scopeAuthorizationMaxAgeSeconds: {
+                                    [key: string]: number;
+                                };
+                            };
+                            activityPub: {
+                                /** Format: uri */
+                                actorUrl: string;
+                                publicNotes: boolean;
+                                transactionalMentions: boolean;
+                            };
+                            capabilities: ('compose_note' | 'notifications.activitypub' | 'wallet.evm')[];
+                            cacheTtlSeconds: number;
+                        };
+                    };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
     mute___create: {
         requestBody: {
             content: {
@@ -37077,6 +37222,150 @@ export interface operations {
             };
             /** @description I'm Ai */
             418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    'v1___mini-apps___identity': {
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        id: string;
+                        username: string;
+                        url: string;
+                    };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    v1___statuses: {
+        requestBody: {
+            content: {
+                'application/json': {
+                    status: string;
+                    /**
+                     * @default public
+                     * @enum {string}
+                     */
+                    visibility?: 'public';
+                };
+            };
+        };
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        id: string;
+                        url: string;
+                    };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

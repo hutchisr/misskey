@@ -11,8 +11,8 @@ export function OAuthPage(props: CommonProps<{
 	clientName: string;
 	clientLogo?: string;
 	scope: string[];
+	authorizationLifetimeSeconds?: number;
 }>) {
-
 	//- Should be removed by the page when it loads, so that it won't needlessly
 	//- stay when user navigates away via the navigation bar
 	//- XXX: Remove navigation bar in auth page?
@@ -23,6 +23,7 @@ export function OAuthPage(props: CommonProps<{
 				<meta name="misskey:oauth:client-name" content={props.clientName} />
 				{props.clientLogo ? <meta name="misskey:oauth:client-logo" content={props.clientLogo} /> : null}
 				<meta name="misskey:oauth:scope" content={props.scope.join(' ')} />
+				{props.authorizationLifetimeSeconds != null ? <meta name="misskey:oauth:authorization-lifetime-seconds" content={props.authorizationLifetimeSeconds.toString()} /> : null}
 			</>
 		);
 	}

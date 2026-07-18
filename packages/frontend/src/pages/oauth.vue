@@ -15,7 +15,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 				:waitOnDeny="true"
 				@accept="onAccept"
 				@deny="onDeny"
-			/>
+			>
+				<template v-if="authorizationDuration" #consentAdditionalInfo>
+					<div>{{ i18n.tsx._auth.authorizationDuration({ duration: authorizationDuration }) }}</div>
+				</template>
+			</MkAuthConfirm>
 		</div>
 	</div>
 </PageWithAnimBg>
@@ -25,6 +29,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 import * as Misskey from 'misskey-js';
 import { definePage } from '@/page.js';
 import MkAuthConfirm from '@/components/MkAuthConfirm.vue';
+import { i18n } from '@/i18n.js';
+import { formatOAuthAuthorizationDuration } from '@/utility/oauth-authorization-duration.js';
 
 const transactionIdMeta = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:transaction-id"]');
 if (transactionIdMeta) {
@@ -33,7 +39,12 @@ if (transactionIdMeta) {
 
 const name = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:client-name"]')?.content;
 const logo = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:client-logo"]')?.content;
-const permissions = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:scope"]')?.content.split(' ').filter((p): p is typeof Misskey.permissions[number] => (Misskey.permissions as readonly string[]).includes(p)) ?? [];
+const oauthPermissions = [...Misskey.permissions, ...Misskey.miniAppPermissions] as const;
+const permissions = window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:scope"]')?.content.split(' ').filter((p): p is typeof oauthPermissions[number] => (oauthPermissions as readonly string[]).includes(p)) ?? [];
+const authorizationLifetimeSeconds = Number(window.document.querySelector<HTMLMetaElement>('meta[name="misskey:oauth:authorization-lifetime-seconds"]')?.content);
+const authorizationDuration = Number.isSafeInteger(authorizationLifetimeSeconds) && authorizationLifetimeSeconds >= 300
+	? formatOAuthAuthorizationDuration(authorizationLifetimeSeconds)
+	: null;
 
 function doPost(token: string, decision: 'accept' | 'deny') {
 	const form = window.document.createElement('form');

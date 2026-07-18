@@ -1,3 +1,11 @@
+## Unreleased
+
+### Client
+- Feat: Fediverse Mini Apps V1 をURLプレビューから安全に起動できるように
+
+### Server
+- Feat: Fediverse Mini Apps V1 向けのマニフェスト検証、OAuth、認証APIに対応
+
 ## 2026.7.0
 
 ### Note

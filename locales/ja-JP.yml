@@ -2477,6 +2477,8 @@ _2fa:
   moreDetailedGuideHere: "詳細なガイドはこちら"
 
 _permissions:
+  identify: "ミニアプリがアカウントを識別する"
+  write: "ミニアプリが公開ノートを作成する"
   "read:account": "アカウントの情報を見る"
   "write:account": "アカウントの情報を変更する"
   "read:blocks": "ブロックを見る"
@@ -2571,6 +2573,12 @@ _auth:
   shareAccessAsk: "アカウントへのアクセスを許可しますか？"
   permission: "{name}は次の権限を要求しています"
   permissionAsk: "このアプリは次の権限を要求しています"
+  authorizationDuration: "この許可は承認後、最大{duration}有効です。設定からいつでも取り消せます。"
+  authorizationDurationYears: "{years}年"
+  authorizationDurationDays: "{days}日"
+  authorizationDurationHours: "{hours}時間"
+  authorizationDurationMinutes: "{minutes}分"
+  authorizationDurationSeconds: "{seconds}秒"
   pleaseGoBack: "アプリケーションに戻ってやっていってください"
   callback: "アプリケーションに戻っています"
   accepted: "アクセスを許可しました"
@@ -3580,3 +3588,16 @@ _qr:
   scanFile: "端末の画像をスキャン"
   raw: "テキスト"
   mfm: "MFM"
+
+_miniApps:
+  check: "ミニアプリを確認"
+  open: "ミニアプリを開く"
+  publishedBy: "{name} が提供"
+  externalNotice: "外部でホストされているアプリです。開くとアプリの提供元に接続します。"
+  connecting: "ミニアプリに接続しています"
+  launchFailed: "ミニアプリを起動できませんでした。"
+  launchTimedOut: "ミニアプリから応答がありませんでした。"
+  requiresHttps: "ミニアプリを起動するにはHTTPS接続が必要です。"
+  authenticationUnsupported: "このミニアプリが要求したログイン方法には対応していません。"
+  authorizationPrompt: "{name} へのログインを続けますか？"
+  authorize: "ログインを続ける"

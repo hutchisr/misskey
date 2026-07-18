@@ -4,7 +4,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<template v-if="player.url && playerEnabled">
+<MkMiniApp v-if="miniApp && showActions" :resolved="miniApp" :compact="compact"/>
+<template v-else-if="player.url && playerEnabled">
 	<div
 		:class="$style.player"
 		:style="player.width ? `padding: ${(player.height || 0) / player.width * 100}% 0 0` : `padding: ${(player.height || 0)}px 0 0`"
@@ -65,6 +66,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</article>
 	</component>
 	<template v-if="showActions">
+		<div v-if="miniAppDiscoveryAvailable" :class="$style.action">
+			<MkButton :small="true" inline :wait="miniAppResolving" @click="discoverMiniApp(true)">
+				<i class="ti ti-device-gamepad-2"></i> {{ i18n.ts._miniApps.check }}
+			</MkButton>
+		</div>
 		<div v-if="tweetId" :class="$style.action">
 			<MkButton :small="true" inline @click="tweetExpanded = true">
 				<i class="ti ti-brand-x"></i> {{ i18n.ts.expandTweet }}
@@ -83,7 +89,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, onDeactivated, onUnmounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onDeactivated, onUnmounted, ref, shallowRef } from 'vue';
 import { url as local } from '@@/js/config.js';
 import { versatileLang } from '@@/js/intl-const.js';
 import type { SummalyResult } from '@misskey-dev/summaly';
@@ -91,7 +97,10 @@ import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { deviceKind } from '@/utility/device-kind.js';
 import MkButton from '@/components/MkButton.vue';
+import MkMiniApp from '@/components/MkMiniApp.vue';
 import { transformPlayerUrl } from '@/utility/url-preview.js';
+import { resolveFediverseMiniApp } from '@/utility/resolve-fediverse-miniapp.js';
+import type { ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
 import { store } from '@/store.js';
 import { prefer } from '@/preferences.js';
 import { maybeMakeRelative } from '@@/js/url.js';
@@ -129,6 +138,10 @@ const tweetExpanded = ref(props.detail);
 const embedId = `embed${Math.random().toString().replace(/\D/, '')}`;
 const tweetHeight = ref(150);
 const unknownUrl = ref(false);
+const miniApp = shallowRef<ResolvedFediverseMiniApp | null>(null);
+const miniAppResolving = ref(false);
+const miniAppDiscoveryAvailable = ref(props.showActions && props.compact && !props.detail);
+const miniAppAbortController = new AbortController();
 
 onDeactivated(() => {
 	playerEnabled.value = false;
@@ -136,6 +149,29 @@ onDeactivated(() => {
 
 const requestUrl = new URL(props.url, window.location.href);
 if (!['http:', 'https:'].includes(requestUrl.protocol)) throw new Error('invalid url');
+const miniAppRequestUrl = requestUrl.href;
+
+// Avoid turning ordinary timeline scrolling into an outbound manifest-fetch amplifier.
+if (props.showActions && (props.detail || !props.compact)) {
+	void discoverMiniApp(false);
+}
+
+async function discoverMiniApp(hideActionOnFailure: boolean): Promise<void> {
+	if (miniAppResolving.value) return;
+	miniAppResolving.value = true;
+	try {
+		const resolved = await resolveFediverseMiniApp(miniAppRequestUrl, miniAppAbortController.signal);
+		if (resolved != null) {
+			miniApp.value = resolved;
+		} else if (hideActionOnFailure) {
+			miniAppDiscoveryAvailable.value = false;
+		}
+	} catch {
+		if (hideActionOnFailure) miniAppDiscoveryAvailable.value = false;
+	} finally {
+		miniAppResolving.value = false;
+	}
+}
 
 if (requestUrl.hostname === 'twitter.com' || requestUrl.hostname === 'mobile.twitter.com' || requestUrl.hostname === 'x.com' || requestUrl.hostname === 'mobile.x.com') {
 	const m = requestUrl.pathname.match(/^\/.+\/status(?:es)?\/(\d+)/);
@@ -196,6 +232,7 @@ function openPlayer(): void {
 window.addEventListener('message', adjustTweetHeight);
 
 onUnmounted(() => {
+	miniAppAbortController.abort();
 	window.removeEventListener('message', adjustTweetHeight);
 });
 </script>

@@ -460,6 +460,7 @@ function toStories(component: string): Promise<string> {
 		globSync('src/components/MkUserSetupDialog.*.vue'),
 		globSync('src/components/MkInstanceCardMini.vue'),
 		globSync('src/components/MkInviteCode.vue'),
+		globSync('src/components/MkMiniApp.vue'),
 		globSync('src/components/MkTagItem.vue'),
 		globSync('src/components/MkRoleSelectDialog.vue'),
 		globSync('src/components/grid/MkGrid.vue'),
@@ -471,5 +472,5 @@ function toStories(component: string): Promise<string> {
 	await Promise.all(components.map(async (component) => {
 		const stories = component.replace(/\.vue$/, '.stories.ts');
 		await writeFile(stories, await toStories(component));
-	}))
+	}));
 })();

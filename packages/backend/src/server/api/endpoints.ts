@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { permissions } from 'misskey-js';
+import { miniAppPermissions, permissions } from 'misskey-js';
 import type { KeyOf, Schema } from '@/misc/json-schema.js';
 
 import * as endpointsObject from './endpoint-list.js';
+
+type EndpointPermission = (typeof permissions)[number] | (typeof miniAppPermissions)[number];
 
 interface IEndpointMetaBase {
 	readonly stability?: 'deprecated' | 'experimental' | 'stable';
@@ -89,6 +91,12 @@ interface IEndpointMetaBase {
 	readonly secure?: boolean;
 
 	/**
+	 * Fediverse Mini App credentials are isolated from the ordinary Misskey API
+	 * unless an endpoint explicitly opts into that credential class.
+	 */
+	readonly allowMiniAppCredential?: boolean;
+
+	/**
 	 * エンドポイントの種類
 	 * パーミッションの実現に利用されます。
 	 */
@@ -115,13 +123,13 @@ export type IEndpointMeta = (Omit<IEndpointMetaBase, 'requireCrential' | 'requir
 	secure: true,
 }) | (Omit<IEndpointMetaBase, 'requireCredential' | 'kind'> & {
 	requireCredential: true,
-	kind: (typeof permissions)[number],
+	kind: EndpointPermission,
 }) | (Omit<IEndpointMetaBase, 'requireModerator' | 'kind'> & {
 	requireModerator: true,
-	kind: (typeof permissions)[number],
+	kind: EndpointPermission,
 }) | (Omit<IEndpointMetaBase, 'requireAdmin' | 'kind'> & {
 	requireAdmin: true,
-	kind: (typeof permissions)[number],
+	kind: EndpointPermission,
 });
 
 export interface IEndpoint {
