@@ -13,6 +13,7 @@
 
 ### Server
 - Feat: Fediverse Mini Apps V1 向けのマニフェスト検証、OAuth、認証APIに対応
+- Enhance: OAuth 2.0 Dynamic Client Registration (RFC 7591) に対応し、Mini App マニフェストを任意の拡張メタデータとして登録できるように
 - Enhance: ユーザーごとに検出・登録した Fediverse Mini Apps を記録するように
 
 ## 2026.7.0

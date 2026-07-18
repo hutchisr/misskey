@@ -6,7 +6,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import pkceChallenge from 'pkce-challenge';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { AccessTokensRepository, UsersRepository } from '@/models/_.js';
+import type { AccessTokensRepository, MiOAuthClient, OAuthClientsRepository, UsersRepository } from '@/models/_.js';
 import type { Config } from '@/config.js';
 import type { IdService } from '@/core/IdService.js';
 import type { HttpRequestService } from '@/core/HttpRequestService.js';
@@ -18,6 +18,7 @@ import type { MiniAppOAuthTokenService, MiniAppOAuthTokenResponse } from '@/core
 import type { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import { OAuth2ProviderService } from '@/server/oauth/OAuth2ProviderService.js';
+import { OAuthClientRegistrationService } from '@/server/oauth/OAuthClientRegistrationService.js';
 
 vi.mock('re2', () => ({ default: RegExp }));
 
@@ -25,6 +26,7 @@ const issuer = 'https://misskey.example';
 const appOrigin = 'https://farm.example';
 const manifestUrl = `${appOrigin}/.well-known/fediverse-miniapp.json`;
 const redirectUri = `${appOrigin}/oauth/callback`;
+const registeredClientId = 'c'.repeat(32);
 const state = 's'.repeat(43);
 
 const resolvedManifest: ResolvedMiniAppManifest = {
@@ -74,8 +76,22 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 	const revoke = vi.fn();
 	const recordMiniApp = vi.fn();
 	const limit = vi.fn();
+	const findOAuthClient = vi.fn();
+	const insertOAuthClient = vi.fn();
+	const registeredClients = new Map<string, MiOAuthClient>();
 
 	beforeAll(async () => {
+		const idService = { gen: vi.fn(() => registeredClientId) } as unknown as IdService;
+		const manifestService = { resolveManifestUrl } as unknown as MiniAppManifestService;
+		const oauthClientsRepository = {
+			findOneBy: findOAuthClient,
+			insert: insertOAuthClient,
+		} as unknown as OAuthClientsRepository;
+		const oauthClientRegistrationService = new OAuthClientRegistrationService(
+			oauthClientsRepository,
+			idService,
+			manifestService,
+		);
 		const miniAppOAuthTokenService = {
 			issueAuthorization,
 			refreshAuthorization,
@@ -86,10 +102,11 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			{ url: issuer } as Config,
 			{ insert: vi.fn(), delete: vi.fn() } as unknown as AccessTokensRepository,
 			{} as UsersRepository,
-			{ gen: vi.fn(() => 'id') } as unknown as IdService,
+			idService,
 			{} as HttpRequestService,
-			{ resolveManifestUrl } as unknown as MiniAppManifestService,
+			manifestService,
 			miniAppOAuthTokenService,
+			oauthClientRegistrationService,
 			{ record: recordMiniApp } as unknown as UserMiniAppService,
 			{ limit } as unknown as RateLimiterService,
 			{
@@ -128,6 +145,28 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 	});
 
 	beforeEach(() => {
+		registeredClients.clear();
+		registeredClients.set(registeredClientId, {
+			id: registeredClientId,
+			createdAt: new Date('2026-07-18T00:00:00.000Z'),
+			kind: 'miniapp',
+			metadata: {
+				redirect_uris: [redirectUri],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+				scope: 'identify write',
+				client_name: resolvedManifest.manifest.name,
+				client_uri: resolvedManifest.manifest.homeUrl,
+				logo_uri: resolvedManifest.manifest.iconUrl,
+				fediverse_miniapp_manifest_uri: manifestUrl,
+			},
+		});
+		findOAuthClient.mockReset().mockImplementation(async ({ id }: { id: string }) => registeredClients.get(id) ?? null);
+		insertOAuthClient.mockReset().mockImplementation(async (client: MiOAuthClient) => {
+			registeredClients.set(client.id, client);
+			return { identifiers: [{ id: client.id }], generatedMaps: [], raw: [] };
+		});
 		resolveManifestUrl.mockReset().mockResolvedValue(resolvedManifest);
 		issueAuthorization.mockReset().mockResolvedValue({ grantId: 'grant1', response: tokenResponse });
 		refreshAuthorization.mockReset().mockResolvedValue(tokenResponse);
@@ -145,7 +184,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(service.generateRFC8414()).toMatchObject({
 			issuer,
 			fediverse_miniapp_profile: '1',
-			registration_endpoint: new URL('/oauth/mini-app/register', issuer),
+			registration_endpoint: new URL('/oauth/register', issuer),
 			revocation_endpoint: new URL('/oauth/revoke', issuer),
 			grant_types_supported: ['authorization_code', 'refresh_token'],
 			token_endpoint_auth_methods_supported: ['none'],
@@ -153,21 +192,229 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 
 		const response = await fastify.inject({
 			method: 'POST',
-			url: '/oauth/mini-app/register',
-			payload: { manifest_url: manifestUrl },
+			url: '/oauth/register',
+			payload: {
+				redirect_uris: [redirectUri],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+				scope: 'identify write',
+				fediverse_miniapp_manifest_uri: manifestUrl,
+			},
 		});
 		expect(response.statusCode).toBe(201);
-		expect(response.json()).toEqual({
-			client_id: manifestUrl,
+		expect(response.json()).toMatchObject({
+			client_id: registeredClientId,
 			redirect_uris: [redirectUri],
 			token_endpoint_auth_method: 'none',
 			grant_types: ['authorization_code', 'refresh_token'],
 			response_types: ['code'],
 			scope: 'identify write',
+			client_name: resolvedManifest.manifest.name,
+			client_uri: resolvedManifest.manifest.homeUrl,
+			logo_uri: resolvedManifest.manifest.iconUrl,
+			fediverse_miniapp_manifest_uri: manifestUrl,
 		});
+		expect(response.json().client_id_issued_at).toEqual(expect.any(Number));
+		expect(insertOAuthClient).toHaveBeenCalledWith(expect.objectContaining({ kind: 'miniapp' }));
 		expect(response.headers['cache-control']).toBe('no-store');
 		expect(response.headers['content-length']).toBeDefined();
 		expect(response.headers['transfer-encoding']).toBeUndefined();
+	});
+
+	test('registers an ordinary public OAuth client without the Mini App extension', async () => {
+		resolveManifestUrl.mockClear();
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/oauth/register',
+			payload: {
+				redirect_uris: ['https://client.example/oauth/callback'],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code'],
+				response_types: ['code'],
+				scope: 'read:account write:notes',
+				client_name: 'Example Client',
+				client_uri: 'https://client.example/',
+				ignored_extension: true,
+			},
+		});
+
+		expect(response.statusCode).toBe(201);
+		expect(response.json()).toMatchObject({
+			client_id: registeredClientId,
+			redirect_uris: ['https://client.example/oauth/callback'],
+			token_endpoint_auth_method: 'none',
+			grant_types: ['authorization_code'],
+			response_types: ['code'],
+			scope: 'read:account write:notes',
+			client_name: 'Example Client',
+			client_uri: 'https://client.example/',
+		});
+		expect(response.json()).not.toHaveProperty('ignored_extension');
+		expect(resolveManifestUrl).not.toHaveBeenCalled();
+		expect(insertOAuthClient).toHaveBeenCalledWith(expect.objectContaining({ kind: 'oauth' }));
+	});
+
+	test('authorizes a registered ordinary OAuth client without fetching a manifest', async () => {
+		registeredClients.set(registeredClientId, {
+			id: registeredClientId,
+			createdAt: new Date('2026-07-18T00:00:00.000Z'),
+			kind: 'oauth',
+			metadata: {
+				redirect_uris: ['https://client.example/oauth/callback'],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code'],
+				response_types: ['code'],
+				scope: 'read:account write:notes',
+				client_name: 'Example Client',
+			},
+		});
+		const challenge = await pkceChallenge(64);
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/oauth/authorize',
+			query: {
+				client_id: registeredClientId,
+				redirect_uri: 'https://client.example/oauth/callback',
+				response_type: 'code',
+				state: 'ordinary-oauth-state',
+				scope: 'read:account',
+				code_challenge: challenge.code_challenge,
+				code_challenge_method: 'S256',
+			},
+		});
+
+			expect(response.statusCode).toBe(200);
+			expect(response.body).toContain('Example Client');
+			expect(response.body).toContain('[https://client.example]');
+			expect(resolveManifestUrl).not.toHaveBeenCalled();
+		});
+
+		test('shows the selected redirect origin for clients with multiple registered origins', async () => {
+			registeredClients.set(registeredClientId, {
+				id: registeredClientId,
+				createdAt: new Date('2026-07-18T00:00:00.000Z'),
+				kind: 'oauth',
+				metadata: {
+					redirect_uris: ['https://trusted.example/oauth/callback', 'https://selected.example/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code'],
+					response_types: ['code'],
+					scope: 'read:account',
+					client_name: 'Example Client',
+				},
+			});
+			const challenge = await pkceChallenge(64);
+			const response = await fastify.inject({
+				method: 'GET',
+				url: '/oauth/authorize',
+				query: {
+					client_id: registeredClientId,
+					redirect_uri: 'https://selected.example/oauth/callback',
+					response_type: 'code',
+					state: 'multiple-origin-oauth-state',
+					scope: 'read:account',
+					code_challenge: challenge.code_challenge,
+					code_challenge_method: 'S256',
+				},
+			});
+
+			expect(response.statusCode).toBe(200);
+			expect(response.body).toContain('[https://selected.example]');
+			expect(response.body).not.toContain('[https://trusted.example]');
+		});
+
+		test('requires native private-use redirect schemes to use reverse-domain notation', async () => {
+			const response = await fastify.inject({
+				method: 'POST',
+				url: '/oauth/register',
+				payload: {
+					redirect_uris: ['openfarmgame:/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code'],
+					response_types: ['code'],
+					scope: 'read:account',
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toMatchObject({ error: 'invalid_redirect_uri' });
+			expect(insertOAuthClient).not.toHaveBeenCalled();
+
+			const reverseDomainResponse = await fastify.inject({
+				method: 'POST',
+				url: '/oauth/register',
+				payload: {
+					redirect_uris: ['com.example.openfarmgame:/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code'],
+					response_types: ['code'],
+					scope: 'read:account',
+				},
+			});
+
+			expect(reverseDomainResponse.statusCode).toBe(201);
+		});
+
+	test('allows a native client to choose a loopback redirect port at authorization time', async () => {
+		registeredClients.set(registeredClientId, {
+			id: registeredClientId,
+			createdAt: new Date('2026-07-18T00:00:00.000Z'),
+			kind: 'oauth',
+			metadata: {
+				redirect_uris: ['http://127.0.0.1/oauth/callback'],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code'],
+				response_types: ['code'],
+				scope: 'read:account',
+				client_name: 'Native Client',
+			},
+		});
+		const challenge = await pkceChallenge(64);
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/oauth/authorize',
+			query: {
+				client_id: registeredClientId,
+				redirect_uri: 'http://127.0.0.1:49152/oauth/callback',
+				response_type: 'code',
+				state: 'native-oauth-state',
+				scope: 'read:account',
+				code_challenge: challenge.code_challenge,
+				code_challenge_method: 'S256',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+	});
+
+	test('rejects Mini App registration metadata that disagrees with the manifest', async () => {
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/oauth/register',
+			payload: {
+				redirect_uris: ['https://attacker.example/oauth/callback'],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+				scope: 'identify write',
+				fediverse_miniapp_manifest_uri: manifestUrl,
+			},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toMatchObject({ error: 'invalid_redirect_uri' });
+		expect(insertOAuthClient).not.toHaveBeenCalled();
+	});
+
+	test('does not expose the former custom Mini App registration route', async () => {
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/oauth/mini-app/register',
+			payload: { manifest_url: manifestUrl },
+		});
+
+		expect(response.statusCode).toBe(404);
 	});
 
 	test('rate limits unauthenticated dynamic registration before resolving a manifest', async () => {
@@ -175,8 +422,15 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 
 		const response = await fastify.inject({
 			method: 'POST',
-			url: '/oauth/mini-app/register',
-			payload: { manifest_url: manifestUrl },
+			url: '/oauth/register',
+			payload: {
+				redirect_uris: [redirectUri],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+				scope: 'identify write',
+				fediverse_miniapp_manifest_uri: manifestUrl,
+			},
 		});
 
 		expect(response.statusCode).toBe(429);
@@ -193,7 +447,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			method: 'GET',
 			url: '/oauth/authorize',
 			query: {
-				client_id: manifestUrl,
+				client_id: registeredClientId,
 				redirect_uri: redirectUri,
 				response_type: 'code',
 				state,
@@ -211,6 +465,27 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(resolveManifestUrl).not.toHaveBeenCalled();
 	});
 
+	test('continues accepting a manifest URL as a legacy Mini App client ID', async () => {
+		const challenge = await pkceChallenge(64);
+		const response = await fastify.inject({
+			method: 'GET',
+			url: '/oauth/authorize',
+			query: {
+				client_id: manifestUrl,
+				redirect_uri: redirectUri,
+				response_type: 'code',
+				state,
+				scope: 'identify write',
+				code_challenge: challenge.code_challenge,
+				code_challenge_method: 'S256',
+				authorization_lifetime_seconds: '31536000',
+			},
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(resolveManifestUrl).toHaveBeenCalledWith(manifestUrl);
+	});
+
 	test('rate limits refresh and revocation before token-service database work', async () => {
 		limit.mockResolvedValueOnce({ code: 'RATE_LIMIT_EXCEEDED', info: { resetMs: Date.now() + 60_000 } });
 		const refreshResponse = await fastify.inject({
@@ -219,7 +494,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			payload: {
 				grant_type: 'refresh_token',
 				refresh_token: `${'r'.repeat(32)}_${'s'.repeat(128)}`,
-				client_id: manifestUrl,
+				client_id: registeredClientId,
 			},
 		});
 		expect(refreshResponse.statusCode).toBe(429);
@@ -239,7 +514,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		const pkce = await pkceChallenge(64);
 		const query = new URLSearchParams({
 			response_type: 'code',
-			client_id: manifestUrl,
+			client_id: registeredClientId,
 			redirect_uri: redirectUri,
 			scope: 'identify write',
 			state,
@@ -275,7 +550,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			payload: new URLSearchParams({
 				grant_type: 'authorization_code',
 				code,
-				client_id: manifestUrl,
+				client_id: registeredClientId,
 				redirect_uri: redirectUri,
 				code_verifier: pkce.code_verifier,
 			}).toString(),
@@ -284,7 +559,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(token.json()).toEqual(tokenResponse);
 		expect(issueAuthorization).toHaveBeenCalledWith(expect.objectContaining({
 			userId: 'user1',
-			clientId: manifestUrl,
+			clientId: registeredClientId,
 			clientName: 'Open Farm Game',
 			scope: ['identify', 'write'],
 		}));
@@ -301,7 +576,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		const pkce = await pkceChallenge(64);
 		const query = new URLSearchParams({
 			response_type: 'code',
-			client_id: manifestUrl,
+			client_id: registeredClientId,
 			redirect_uri: redirectUri,
 			scope: 'identify write',
 			state,
@@ -326,12 +601,12 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			payload: new URLSearchParams({
 				grant_type: 'refresh_token',
 				refresh_token: 'old-refresh',
-				client_id: manifestUrl,
+				client_id: registeredClientId,
 			}).toString(),
 		});
 		expect(refresh.statusCode).toBe(200);
 		expect(refresh.json()).toEqual(tokenResponse);
-		expect(refreshAuthorization).toHaveBeenCalledWith('old-refresh', manifestUrl);
+		expect(refreshAuthorization).toHaveBeenCalledWith('old-refresh', registeredClientId);
 
 		const revocation = await fastify.inject({
 			method: 'POST',

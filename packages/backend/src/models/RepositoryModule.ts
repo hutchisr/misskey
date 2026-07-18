@@ -44,6 +44,7 @@ import {
 	MiNoteReaction,
 	MiNoteThreadMuting,
 	MiNoteDraft,
+	MiOAuthClient,
 	MiPage,
 	MiPageLike,
 	MiPasswordResetRequest,
@@ -335,6 +336,12 @@ const $accessTokensRepository: Provider = {
 	inject: [DI.db],
 };
 
+const $oauthClientsRepository: Provider = {
+	provide: DI.oauthClientsRepository,
+	useFactory: (db: DataSource) => db.getRepository(MiOAuthClient).extend(miRepository as MiRepository<MiOAuthClient>),
+	inject: [DI.db],
+};
+
 const $userMiniAppsRepository: Provider = {
 	provide: DI.userMiniAppsRepository,
 	useFactory: (db: DataSource) => db.getRepository(MiUserMiniApp).extend(miRepository as MiRepository<MiUserMiniApp>),
@@ -595,6 +602,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$oauthClientsRepository,
 		$userMiniAppsRepository,
 		$signinsRepository,
 		$pagesRepository,
@@ -674,6 +682,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$oauthClientsRepository,
 		$userMiniAppsRepository,
 		$signinsRepository,
 		$pagesRepository,

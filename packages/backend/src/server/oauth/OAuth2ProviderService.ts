@@ -22,6 +22,7 @@ import { CacheService } from '@/core/CacheService.js';
 import { MiniAppManifestService } from '@/core/MiniAppManifestService.js';
 import { getIpHash } from '@/misc/get-ip-hash.js';
 import type { MiLocalUser } from '@/models/User.js';
+import type { MiOAuthClient, MiOAuthClientMetadata } from '@/models/OAuthClient.js';
 import { MemoryKVCache } from '@/misc/cache.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import Logger from '@/logger.js';
@@ -31,6 +32,7 @@ import { OAuthPage } from '@/server/web/views/oauth.js';
 import { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
 import { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import { RateLimiterService } from '@/server/api/RateLimiterService.js';
+import { OAuthClientRegistrationService } from './OAuthClientRegistrationService.js';
 import {
 	AccessDeniedError,
 	InvalidGrantError,
@@ -104,7 +106,7 @@ function validateClientId(raw: string): URL {
 	return url;
 }
 
-type OAuthClientKind = 'indieauth' | 'miniapp';
+type OAuthClientKind = 'indieauth' | 'oauth' | 'miniapp';
 
 interface ClientInformation {
 	id: string;
@@ -112,6 +114,7 @@ interface ClientInformation {
 	name: string;
 	logo: string | null;
 	miniAppHomeUrl?: string;
+	miniAppManifestUrl?: string;
 }
 
 interface OAuthRequestParameters {
@@ -367,13 +370,13 @@ function applyNoStore(reply: FastifyReply): void {
 	reply.header('Pragma', 'no-cache');
 }
 
-function sendMiniAppRateLimit(reply: FastifyReply, resetMs: number): void {
+function sendOAuthRateLimit(reply: FastifyReply, resetMs: number, description = 'Too many OAuth requests'): void {
 	applyNoStore(reply);
 	const retryAfterSeconds = Math.max(0, Math.ceil((resetMs - Date.now()) / 1000));
 	reply.header('Retry-After', retryAfterSeconds.toString(10));
 	reply.code(429).send({
 		error: 'temporarily_unavailable',
-		error_description: 'Too many mini app authorization requests',
+		error_description: description,
 	});
 }
 
@@ -439,6 +442,46 @@ function redirectWithQuery(reply: FastifyReply, redirectUriString: string, paylo
 	reply.code(302).redirect(redirectUri.toString());
 }
 
+function redirectUriMatchesRegistered(requested: string, registered: string): boolean {
+	if (requested === registered) return true;
+
+	try {
+		const requestedUrl = new URL(requested);
+		const registeredUrl = new URL(registered);
+		const loopbackHosts = ['localhost', '127.0.0.1', '[::1]'];
+		return (
+			requestedUrl.protocol === 'http:' &&
+			registeredUrl.protocol === 'http:' &&
+			requestedUrl.hostname === registeredUrl.hostname &&
+			loopbackHosts.includes(requestedUrl.hostname) &&
+			requestedUrl.username === '' &&
+			requestedUrl.password === '' &&
+			requestedUrl.pathname === registeredUrl.pathname &&
+			requestedUrl.search === registeredUrl.search &&
+			requestedUrl.hash === '' &&
+			registeredUrl.hash === ''
+		);
+	} catch {
+		return false;
+	}
+}
+
+function registeredClientDisplayName(metadata: MiOAuthClientMetadata, redirectUri: string, clientId: string): string {
+	let identity = clientId;
+	try {
+		const url = new URL(redirectUri);
+		identity = url.protocol === 'http:' || url.protocol === 'https:'
+			? url.origin
+			: url.protocol;
+	} catch {
+		// Registration validation prevents this, but retain the opaque client ID as a safe fallback.
+	}
+
+	return metadata.client_name == null
+		? identity
+		: `${metadata.client_name} [${identity}]`;
+}
+
 function registerFormBodyParser(fastify: FastifyInstance): void {
 	if (fastify.hasContentTypeParser('application/x-www-form-urlencoded')) {
 		return;
@@ -470,6 +513,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private httpRequestService: HttpRequestService,
 		private miniAppManifestService: MiniAppManifestService,
 		private miniAppOAuthTokenService: MiniAppOAuthTokenService,
+		private oauthClientRegistrationService: OAuthClientRegistrationService,
 		private userMiniAppService: UserMiniAppService,
 		private rateLimiterService: RateLimiterService,
 		private cacheService: CacheService,
@@ -481,9 +525,104 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		this.#logger = loggerService.getLogger('oauth');
 	}
 
+	async #resolveMiniAppAuthorizationRequest(
+		params: OAuthRequestParameters,
+		clientId: string,
+		manifestUrl: string,
+		registeredMetadata?: MiOAuthClientMetadata,
+		onValidatedRedirect?: (clientKind: OAuthClientKind, redirectUri: string, state?: string) => void,
+	): Promise<AuthorizationRequestSeed> {
+		const redirectUriValue = firstValue(params.redirect_uri);
+		const state = firstValue(params.state);
+		const codeChallenge = firstValue(params.code_challenge);
+		const codeChallengeMethod = firstValue(params.code_challenge_method);
+		const requestedScope = normalizeScope(params.scope);
+
+		for (const name of [
+			'client_id',
+			'redirect_uri',
+			'response_type',
+			'state',
+			'scope',
+			'code_challenge',
+			'code_challenge_method',
+			'authorization_lifetime_seconds',
+		]) {
+			requireSingleParameter(params, name);
+		}
+
+		validateMiniAppClientIdValue(clientId);
+		const resolved = await this.miniAppManifestService.resolveManifestUrl(manifestUrl).catch(() => {
+			throw new InvalidRequestError('Unable to resolve mini app manifest');
+		});
+		if (resolved.manifestUrl !== manifestUrl) {
+			throw new InvalidRequestError('Mini App manifest URL must be canonical');
+		}
+
+		const registeredRedirectUris = registeredMetadata?.redirect_uris ?? resolved.manifest.oauth.redirectUris;
+		if (
+			!redirectUriValue ||
+			!registeredRedirectUris.includes(redirectUriValue) ||
+			!resolved.manifest.oauth.redirectUris.includes(redirectUriValue)
+		) {
+			throw new InvalidRequestError('Invalid redirect_uri');
+		}
+		onValidatedRedirect?.('miniapp', redirectUriValue, state);
+
+		const registeredScopes = registeredMetadata == null ? resolved.manifest.oauth.scopes : normalizeScope(registeredMetadata.scope);
+		if (
+			requestedScope.length === 0 ||
+			new Set(requestedScope).size !== requestedScope.length ||
+			requestedScope.some(scope => !registeredScopes.includes(scope) || !(resolved.manifest.oauth.scopes as readonly string[]).includes(scope))
+		) {
+			throw new InvalidScopeError('`scope` parameter contains a scope not allowed by the mini app manifest', requestedScope.join(' '));
+		}
+
+		if (state == null || !/^[A-Za-z0-9_-]{43,256}$/.test(state)) {
+			throw new InvalidRequestError('`state` parameter must be 43 to 256 base64url characters');
+		}
+		if (codeChallenge == null || !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)) {
+			throw new InvalidRequestError('`code_challenge` parameter must be 43 to 128 base64url characters');
+		}
+
+		const authorizationLifetimeRaw = requireSingleParameter(params, 'authorization_lifetime_seconds');
+		if (authorizationLifetimeRaw == null || !/^[1-9][0-9]*$/.test(authorizationLifetimeRaw)) {
+			throw new InvalidRequestError('`authorization_lifetime_seconds` parameter must be an integer');
+		}
+		const authorizationLifetimeSeconds = Number(authorizationLifetimeRaw);
+		const manifestMaximum = Math.min(...requestedScope.map(scope => resolved.manifest.oauth.scopeAuthorizationMaxAgeSeconds[scope]));
+		if (
+			!Number.isSafeInteger(authorizationLifetimeSeconds) ||
+			authorizationLifetimeSeconds < minimumMiniAppAuthorizationLifetimeSeconds ||
+			authorizationLifetimeSeconds > Math.min(manifestMaximum, maximumMiniAppAuthorizationLifetimeSeconds)
+		) {
+			throw new InvalidRequestError('`authorization_lifetime_seconds` is outside the allowed range');
+		}
+
+		return {
+			clientInfo: {
+				id: clientId,
+				redirectUris: [...registeredRedirectUris],
+				name: resolved.manifest.name,
+				logo: resolved.manifest.iconUrl,
+				miniAppHomeUrl: resolved.manifest.homeUrl,
+				miniAppManifestUrl: resolved.manifestUrl,
+			},
+			clientKind: 'miniapp',
+			clientId,
+			redirectUri: redirectUriValue,
+			state,
+			requestedScope,
+			codeChallenge,
+			codeChallengeMethod,
+			authorizationLifetimeSeconds,
+		};
+	}
+
 	async #resolveAuthorizationRequest(
 		params: OAuthRequestParameters,
 		onValidatedRedirect?: (clientKind: OAuthClientKind, redirectUri: string, state?: string) => void,
+		preloadedClient?: MiOAuthClient | null,
 	): Promise<AuthorizationRequestSeed> {
 		const clientId = firstValue(params.client_id);
 		const redirectUriValue = firstValue(params.redirect_uri);
@@ -503,79 +642,52 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			throw new InvalidRequestError('client_id must be provided');
 		}
 
-		if (isMiniAppClientIdCandidate(clientId)) {
-			for (const name of [
-				'client_id',
-				'redirect_uri',
-				'response_type',
-				'state',
-				'scope',
-				'code_challenge',
-				'code_challenge_method',
-				'authorization_lifetime_seconds',
-			]) {
+		const registeredClient = preloadedClient === undefined
+			? await this.oauthClientRegistrationService.findById(clientId)
+			: preloadedClient;
+		if (registeredClient?.kind === 'miniapp') {
+			const manifestUrl = registeredClient.metadata.fediverse_miniapp_manifest_uri;
+			if (manifestUrl == null) throw new InvalidRequestError('Registered Mini App has no manifest URL');
+			return await this.#resolveMiniAppAuthorizationRequest(params, clientId, manifestUrl, registeredClient.metadata, onValidatedRedirect);
+		}
+
+		if (registeredClient?.kind === 'oauth') {
+			for (const name of ['client_id', 'redirect_uri', 'response_type', 'state', 'scope', 'code_challenge', 'code_challenge_method']) {
 				requireSingleParameter(params, name);
 			}
-
-			validateMiniAppClientIdValue(clientId);
-			const resolved = await this.miniAppManifestService.resolveManifestUrl(clientId).catch(() => {
-				throw new InvalidRequestError('Unable to resolve mini app manifest');
-			});
-			if (resolved.manifestUrl !== clientId) {
-				throw new InvalidRequestError('client_id must be the canonical mini app manifest URL');
-			}
-
-			if (!redirectUriValue || !resolved.manifest.oauth.redirectUris.includes(redirectUriValue)) {
+			if (!redirectUriValue || !registeredClient.metadata.redirect_uris.some(uri => redirectUriMatchesRegistered(redirectUriValue, uri))) {
 				throw new InvalidRequestError('Invalid redirect_uri');
 			}
-			onValidatedRedirect?.('miniapp', redirectUriValue, state);
+			onValidatedRedirect?.('oauth', redirectUriValue, state);
 
+			const registeredScopes = normalizeScope(registeredClient.metadata.scope);
 			if (
 				requestedScope.length === 0 ||
 				new Set(requestedScope).size !== requestedScope.length ||
-				requestedScope.some(scope => !(resolved.manifest.oauth.scopes as readonly string[]).includes(scope))
+				requestedScope.some(scope => !registeredScopes.includes(scope))
 			) {
-				throw new InvalidScopeError('`scope` parameter contains a scope not allowed by the mini app manifest', requestedScope.join(' '));
-			}
-
-			if (state == null || !/^[A-Za-z0-9_-]{43,256}$/.test(state)) {
-				throw new InvalidRequestError('`state` parameter must be 43 to 256 base64url characters');
-			}
-			if (codeChallenge == null || !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)) {
-				throw new InvalidRequestError('`code_challenge` parameter must be 43 to 128 base64url characters');
-			}
-
-			const authorizationLifetimeRaw = requireSingleParameter(params, 'authorization_lifetime_seconds');
-			if (authorizationLifetimeRaw == null || !/^[1-9][0-9]*$/.test(authorizationLifetimeRaw)) {
-				throw new InvalidRequestError('`authorization_lifetime_seconds` parameter must be an integer');
-			}
-			const authorizationLifetimeSeconds = Number(authorizationLifetimeRaw);
-			const manifestMaximum = Math.min(...requestedScope.map(scope => resolved.manifest.oauth.scopeAuthorizationMaxAgeSeconds[scope]));
-			if (
-				!Number.isSafeInteger(authorizationLifetimeSeconds) ||
-				authorizationLifetimeSeconds < minimumMiniAppAuthorizationLifetimeSeconds ||
-				authorizationLifetimeSeconds > Math.min(manifestMaximum, maximumMiniAppAuthorizationLifetimeSeconds)
-			) {
-				throw new InvalidRequestError('`authorization_lifetime_seconds` is outside the allowed range');
+				throw new InvalidScopeError('`scope` parameter contains a scope not allowed by the registered client', requestedScope.join(' '));
 			}
 
 			return {
 				clientInfo: {
-					id: resolved.manifestUrl,
-					redirectUris: [...resolved.manifest.oauth.redirectUris],
-					name: resolved.manifest.name,
-					logo: resolved.manifest.iconUrl,
-					miniAppHomeUrl: resolved.manifest.homeUrl,
+					id: registeredClient.id,
+					redirectUris: [...registeredClient.metadata.redirect_uris],
+					name: registeredClientDisplayName(registeredClient.metadata, redirectUriValue, registeredClient.id),
+					logo: null,
 				},
-				clientKind: 'miniapp',
-				clientId: resolved.manifestUrl,
+				clientKind: 'oauth',
+				clientId: registeredClient.id,
 				redirectUri: redirectUriValue,
 				state,
 				requestedScope,
 				codeChallenge,
 				codeChallengeMethod,
-				authorizationLifetimeSeconds,
 			};
+		}
+
+		if (isMiniAppClientIdCandidate(clientId)) {
+			return await this.#resolveMiniAppAuthorizationRequest(params, clientId, clientId, undefined, onValidatedRedirect);
 		}
 
 		const clientUrl = validateClientId(clientId);
@@ -672,7 +784,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			issuer: this.config.url,
 			authorization_endpoint: new URL('/oauth/authorize', this.config.url),
 			token_endpoint: new URL('/oauth/token', this.config.url),
-			registration_endpoint: new URL('/oauth/mini-app/register', this.config.url),
+			registration_endpoint: new URL('/oauth/register', this.config.url),
 			revocation_endpoint: new URL('/oauth/revoke', this.config.url),
 			scopes_supported: [...kinds, ...miniAppPermissions],
 			response_types_supported: ['code'],
@@ -689,40 +801,21 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 	public async createServer(fastify: FastifyInstance): Promise<void> {
 		registerFormBodyParser(fastify);
 
-		fastify.post('/mini-app/register', { bodyLimit: 16 * 1024 }, async (request, reply) => {
+		fastify.post('/register', { bodyLimit: 16 * 1024 }, async (request, reply) => {
 			applyNoStore(reply);
 			try {
 				const rateLimit = await this.rateLimiterService.limit({
-					key: 'mini-app-registration',
+					key: 'oauth-client-registration',
 					duration: 60 * 60 * 1000,
 					max: 120,
 				}, getIpHash(request.ip));
 				if (rateLimit != null) {
-					sendMiniAppRateLimit(reply, rateLimit.info.resetMs);
+					sendOAuthRateLimit(reply, rateLimit.info.resetMs, 'Too many client registration requests');
 					return;
 				}
 
-				if (request.body == null || typeof request.body !== 'object' || Array.isArray(request.body)) {
-					throw new InvalidRequestError('JSON body must contain manifest_url');
-				}
-				const body = request.body as Record<string, unknown>;
-				if (Object.keys(body).length !== 1 || typeof body.manifest_url !== 'string') {
-					throw new InvalidRequestError('JSON body must contain only manifest_url');
-				}
-
-				const resolved = await this.miniAppManifestService.resolveManifestUrl(body.manifest_url).catch(() => {
-					throw new InvalidRequestError('Unable to resolve mini app manifest');
-				});
-				validateMiniAppClientIdValue(resolved.manifestUrl);
-
-				reply.code(201).send({
-					client_id: resolved.manifestUrl,
-					redirect_uris: resolved.manifest.oauth.redirectUris,
-					token_endpoint_auth_method: 'none',
-					grant_types: ['authorization_code', 'refresh_token'],
-					response_types: ['code'],
-					scope: resolved.manifest.oauth.scopes.join(' '),
-				});
+				const registration = await this.oauthClientRegistrationService.register(request.body);
+				reply.code(201).send(registration);
 			} catch (error) {
 				sendOAuthProviderError(reply, normalizeOAuthProviderError(error));
 			}
@@ -737,7 +830,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					max: 600,
 				}, getIpHash(request.ip));
 				if (rateLimit != null) {
-					sendMiniAppRateLimit(reply, rateLimit.info.resetMs);
+					sendOAuthRateLimit(reply, rateLimit.info.resetMs);
 					return;
 				}
 
@@ -762,14 +855,15 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			try {
 				const query = request.query as OAuthRequestParameters;
 				const candidateClientId = firstValue(query.client_id);
-				if (candidateClientId != null && isMiniAppClientIdCandidate(candidateClientId)) {
+				const candidateRegisteredClient = candidateClientId == null ? null : await this.oauthClientRegistrationService.findById(candidateClientId);
+				if (candidateClientId != null && (isMiniAppClientIdCandidate(candidateClientId) || candidateRegisteredClient?.kind === 'miniapp')) {
 					const rateLimit = await this.rateLimiterService.limit({
 						key: 'mini-app-authorization',
 						duration: 60 * 60 * 1000,
 						max: 120,
 					}, getIpHash(request.ip));
 					if (rateLimit != null) {
-						sendMiniAppRateLimit(reply, rateLimit.info.resetMs);
+						sendOAuthRateLimit(reply, rateLimit.info.resetMs);
 						return;
 					}
 				}
@@ -778,7 +872,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					clientKind = validatedClientKind;
 					validatedRedirectUri = redirectUri;
 					state = validatedState;
-				});
+				}, candidateRegisteredClient);
 				const { clientInfo } = seed;
 				const authorizationRequest = this.#finalizeAuthorizationRequest(seed);
 
@@ -850,7 +944,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					}
 					await this.userMiniAppService.record({
 						userId: user.id,
-						manifestUrl: transaction.client.id,
+						manifestUrl: transaction.client.miniAppManifestUrl ?? transaction.client.id,
 						launchUrl: transaction.client.miniAppHomeUrl,
 						name: transaction.client.name,
 						iconUrl: transaction.client.logo,
@@ -920,7 +1014,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 						max: 600,
 					}, getIpHash(request.ip));
 					if (rateLimit != null) {
-						sendMiniAppRateLimit(reply, rateLimit.info.resetMs);
+						sendOAuthRateLimit(reply, rateLimit.info.resetMs);
 						return;
 					}
 

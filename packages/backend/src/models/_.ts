@@ -51,6 +51,7 @@ import { MiNoteDraft } from '@/models/NoteDraft.js';
 import { MiNoteFavorite } from '@/models/NoteFavorite.js';
 import { MiNoteReaction } from '@/models/NoteReaction.js';
 import { MiNoteThreadMuting } from '@/models/NoteThreadMuting.js';
+import { MiOAuthClient } from '@/models/OAuthClient.js';
 import { MiPage } from '@/models/Page.js';
 import { MiPageLike } from '@/models/PageLike.js';
 import { MiPasswordResetRequest } from '@/models/PasswordResetRequest.js';
@@ -133,6 +134,7 @@ export {
 	MiNoteFavorite,
 	MiNoteReaction,
 	MiNoteThreadMuting,
+	MiOAuthClient,
 	MiPage,
 	MiPageLike,
 	MiPasswordResetRequest,
@@ -182,6 +184,7 @@ export type AbuseReportNotificationRecipientRepository =
 	Repository<MiAbuseReportNotificationRecipient>
 	& MiRepository<MiAbuseReportNotificationRecipient>;
 export type AccessTokensRepository = Repository<MiAccessToken> & MiRepository<MiAccessToken>;
+export type OAuthClientsRepository = Repository<MiOAuthClient> & MiRepository<MiOAuthClient>;
 export type AdsRepository = Repository<MiAd> & MiRepository<MiAd>;
 export type AnnouncementsRepository = Repository<MiAnnouncement> & MiRepository<MiAnnouncement>;
 export type AnnouncementReadsRepository = Repository<MiAnnouncementRead> & MiRepository<MiAnnouncementRead>;
