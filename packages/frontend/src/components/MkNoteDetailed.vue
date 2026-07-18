@@ -294,7 +294,6 @@ function claimMiniAppManifest(manifestUrl: string): boolean {
 	return true;
 }
 
-
 // コンポーサブルの呼び出し
 const {
 	note,
