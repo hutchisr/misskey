@@ -4,7 +4,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkMiniApp v-if="miniApp && showActions" :resolved="miniApp" :compact="compact"/>
+<template v-if="duplicateMiniApp"></template>
+<MkMiniApp v-else-if="miniApp && showActions" :resolved="miniApp" :compact="compact"/>
 <template v-else-if="player.url && playerEnabled">
 	<div
 		:class="$style.player"
@@ -105,10 +106,12 @@ const props = withDefaults(defineProps<{
 	detail?: boolean;
 	compact?: boolean;
 	showActions?: boolean;
+	claimMiniAppManifest?: (manifestUrl: string) => boolean;
 }>(), {
 	detail: false,
 	compact: false,
 	showActions: true,
+	claimMiniAppManifest: () => true,
 });
 
 const MOBILE_THRESHOLD = 500;
@@ -134,6 +137,7 @@ const embedId = `embed${Math.random().toString().replace(/\D/, '')}`;
 const tweetHeight = ref(150);
 const unknownUrl = ref(false);
 const miniApp = shallowRef<ResolvedFediverseMiniApp | null>(null);
+const duplicateMiniApp = ref(false);
 const miniAppDiscoveryAttempted = ref(false);
 const miniAppAbortController = new AbortController();
 
@@ -158,6 +162,11 @@ async function discoverMiniApp(): Promise<void> {
 	try {
 		const resolved = await resolveFediverseMiniApp(miniAppRequestUrl, miniAppAbortController.signal);
 		if (resolved != null) {
+			if (!props.claimMiniAppManifest(resolved.manifestUrl)) {
+				duplicateMiniApp.value = true;
+				return;
+			}
+
 			miniApp.value = resolved;
 		}
 	} catch {

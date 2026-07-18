@@ -100,7 +100,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						:class="$style.poll"
 					/>
 					<div v-if="isEnabledUrlPreview">
-						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :class="$style.urlPreview"/>
+						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="false" :claimMiniAppManifest="claimMiniAppManifest" :class="$style.urlPreview"/>
 					</div>
 					<div v-if="appearNote.renoteId" :class="$style.quote"><MkNoteSimple :note="appearNote?.renote ?? null" :class="$style.quoteNote"/></div>
 					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click="collapsed = false">
@@ -302,6 +302,15 @@ const {
 provide(DI.mfmEmojiReactCallback, reactViaMfmEmoji);
 
 // MkNote固有
+const miniAppManifestClaims = computed(() => isEnabledUrlPreview.value ? new Set<string>() : null);
+
+function claimMiniAppManifest(manifestUrl: string): boolean {
+	const claims = miniAppManifestClaims.value;
+	if (claims == null || claims.has(manifestUrl)) return false;
+	claims.add(manifestUrl);
+	return true;
+}
+
 const showSoftWordMutedWord = computed(() => prefer.s.showSoftWordMutedWord);
 
 function handleToggleReact() {

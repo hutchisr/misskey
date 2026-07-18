@@ -45,7 +45,7 @@ describe('MkUrlPreview', () => {
 	const renderPreviewBy = async (
 		summary: Partial<SummalyResult>,
 		miniAppResponse?: unknown,
-		previewProps: Partial<{ detail: boolean; compact: boolean; showActions: boolean }> = {},
+		previewProps: Partial<{ detail: boolean; compact: boolean; showActions: boolean; claimMiniAppManifest: (manifestUrl: string) => boolean }> = {},
 	): Promise<RenderResult> => {
 		if (!summary.player) {
 			summary.player = {
@@ -161,6 +161,76 @@ describe('MkUrlPreview', () => {
 		assert.notExists(mkUrlPreview.container.querySelector('iframe'));
 		assert.strictEqual(popups.value.length, 1);
 		popups.value[0].events.closed();
+	});
+
+	test('Only one Mini App is shown when note previews resolve the same manifest', async () => {
+		const appOrigin = 'https://deduplicated-miniapp.example';
+		const manifestUrl = `${appOrigin}/.well-known/fediverse-miniapp.json`;
+		const miniAppManifestClaims = new Set<string>();
+		const claimMiniAppManifest = (candidateManifestUrl: string): boolean => {
+			if (miniAppManifestClaims.has(candidateManifestUrl)) return false;
+			miniAppManifestClaims.add(candidateManifestUrl);
+			return true;
+		};
+		const resolved = {
+			manifestUrl,
+			appOrigin,
+			launchUrl: `${appOrigin}/farm/one`,
+			expiresAt: '2099-01-01T00:00:00.000Z',
+			manifest: {
+				version: '1',
+				name: 'Deduplicated Farm Game',
+				publisher: {
+					name: 'Deduplicated Farm Game',
+					url: `${appOrigin}/about`,
+				},
+				homeUrl: `${appOrigin}/`,
+				iconUrl: `${appOrigin}/icon.png`,
+				splash: {
+					imageUrl: `${appOrigin}/splash.png`,
+					backgroundColor: '#173f2b',
+				},
+				oauth: {
+					redirectUris: [`${appOrigin}/oauth/callback`],
+					scopes: ['identify', 'write'],
+					scopeAuthorizationMaxAgeSeconds: {
+						identify: 31_536_000,
+						write: 31_536_000,
+					},
+				},
+				activityPub: {
+					actorUrl: `${appOrigin}/ap/actor`,
+					publicNotes: true,
+					transactionalMentions: false,
+				},
+				capabilities: [],
+				cacheTtlSeconds: 300,
+			},
+		};
+
+		const first = await renderPreviewBy({
+			url: `${appOrigin}/farm/one`,
+			description: 'First farm link',
+		}, resolved, {
+			claimMiniAppManifest,
+		});
+		await first.findByRole('button', { name: 'Open mini app' });
+
+		const second = await renderPreviewBy({
+			url: `${appOrigin}/farm/two`,
+			description: 'Second farm link',
+		}, {
+			...resolved,
+			launchUrl: `${appOrigin}/farm/two`,
+		}, {
+			claimMiniAppManifest,
+		});
+
+		await waitFor(() => {
+			assert.deepEqual([...miniAppManifestClaims], [manifestUrl]);
+			assert.isNull(second.container.querySelector('button'));
+			assert.strictEqual(second.container.textContent, '');
+		});
 	});
 
 	test('A compact timeline preview automatically discovers a Mini App when visible', async () => {

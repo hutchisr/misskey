@@ -124,7 +124,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						:class="$style.poll"
 					/>
 					<div v-if="isEnabledUrlPreview">
-						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="true" style="margin-top: 6px;"/>
+						<MkUrlPreview v-for="url in urls" :key="url" :url="url" :compact="true" :detail="true" :claimMiniAppManifest="claimMiniAppManifest" style="margin-top: 6px;"/>
 					</div>
 					<div v-if="appearNote.renoteId" :class="$style.quote"><MkNoteSimple :note="appearNote?.renote ?? null" :class="$style.quoteNote"/></div>
 				</div>
@@ -285,6 +285,14 @@ const renoteTime = useTemplateRef('renoteTime');
 const reactButton = useTemplateRef('reactButton');
 const clipButton = useTemplateRef('clipButton');
 const galleryEl = useTemplateRef('galleryEl');
+const miniAppManifestClaims = computed(() => isEnabledUrlPreview.value ? new Set<string>() : null);
+
+function claimMiniAppManifest(manifestUrl: string): boolean {
+	const claims = miniAppManifestClaims.value;
+	if (claims == null || claims.has(manifestUrl)) return false;
+	claims.add(manifestUrl);
+	return true;
+}
 
 // コンポーサブルの呼び出し
 const {
