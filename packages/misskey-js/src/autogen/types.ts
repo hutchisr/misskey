@@ -2957,6 +2957,16 @@ export type paths = {
          */
         post: operations['miauth___gen-token'];
     };
+    '/mini-apps/list': {
+        /**
+         * mini-apps/list
+         * @description List Fediverse Mini Apps discovered or registered by the current user.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['mini-apps___list'];
+    };
     '/mini-apps/resolve': {
         /**
          * mini-apps/resolve
@@ -28989,6 +28999,86 @@ export interface operations {
                     'application/json': {
                         token: string;
                     };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    'mini-apps___list': {
+        requestBody: {
+            content: {
+                'application/json': {
+                    /** @default 12 */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        /** Format: misskey:id */
+                        id: string;
+                        /** Format: uri */
+                        manifestUrl: string;
+                        /** Format: uri */
+                        launchUrl: string;
+                        name: string;
+                        /** Format: uri */
+                        iconUrl: string | null;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        lastDiscoveredAt: string;
+                    }[];
                 };
             };
             /** @description Client error */

@@ -307,6 +307,7 @@ export * as 'invite/delete' from './endpoints/invite/delete.js';
 export * as 'invite/limit' from './endpoints/invite/limit.js';
 export * as 'invite/list' from './endpoints/invite/list.js';
 export * as 'meta' from './endpoints/meta.js';
+export * as 'mini-apps/list' from './endpoints/mini-apps/list.js';
 export * as 'mini-apps/resolve' from './endpoints/mini-apps/resolve.js';
 export * as 'miauth/gen-token' from './endpoints/miauth/gen-token.js';
 export * as 'mute/create' from './endpoints/mute/create.js';

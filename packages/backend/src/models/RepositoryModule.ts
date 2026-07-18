@@ -73,6 +73,7 @@ import {
 	MiUserListFavorite,
 	MiUserListMembership,
 	MiUserMemo,
+	MiUserMiniApp,
 	MiUserNotePining,
 	MiUserPending,
 	MiUserProfile,
@@ -334,6 +335,12 @@ const $accessTokensRepository: Provider = {
 	inject: [DI.db],
 };
 
+const $userMiniAppsRepository: Provider = {
+	provide: DI.userMiniAppsRepository,
+	useFactory: (db: DataSource) => db.getRepository(MiUserMiniApp).extend(miRepository as MiRepository<MiUserMiniApp>),
+	inject: [DI.db],
+};
+
 const $signinsRepository: Provider = {
 	provide: DI.signinsRepository,
 	useFactory: (db: DataSource) => db.getRepository(MiSignin).extend(miRepository as MiRepository<MiSignin>),
@@ -588,6 +595,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$userMiniAppsRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,
@@ -666,6 +674,7 @@ const $reversiGamesRepository: Provider = {
 		$registrationTicketsRepository,
 		$authSessionsRepository,
 		$accessTokensRepository,
+		$userMiniAppsRepository,
 		$signinsRepository,
 		$pagesRepository,
 		$pageLikesRepository,

@@ -2021,6 +2021,8 @@ declare namespace entities {
         MetaResponse,
         MiauthGenTokenRequest,
         MiauthGenTokenResponse,
+        MiniAppsListRequest,
+        MiniAppsListResponse,
         MiniAppsResolveRequest,
         MiniAppsResolveResponse,
         MuteCreateRequest,
@@ -2893,6 +2895,12 @@ type MiauthGenTokenResponse = operations['miauth___gen-token']['responses']['200
 //
 // @public (undocumented)
 export const miniAppPermissions: readonly ["identify", "write"];
+
+// @public (undocumented)
+type MiniAppsListRequest = operations['mini-apps___list']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type MiniAppsListResponse = operations['mini-apps___list']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type MiniAppsResolveRequest = operations['mini-apps___resolve']['requestBody']['content']['application/json'];

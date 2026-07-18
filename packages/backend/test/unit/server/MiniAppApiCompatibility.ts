@@ -7,6 +7,8 @@ import { describe, expect, test, vi } from 'vitest';
 import type { Config } from '@/config.js';
 import type { NoteCreateService } from '@/core/NoteCreateService.js';
 import type { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
+import type { MiniAppManifestService, ResolvedMiniAppManifest } from '@/core/MiniAppManifestService.js';
+import type { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import type { AccessTokensRepository, AppsRepository, UsersRepository } from '@/models/_.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
 import type { MiLocalUser } from '@/models/User.js';
@@ -15,6 +17,7 @@ import { ApiCallService } from '@/server/api/ApiCallService.js';
 import IdentityEndpoint from '@/server/api/endpoints/v1/mini-apps/identity.js';
 import StatusesEndpoint from '@/server/api/endpoints/v1/statuses.js';
 import RevokeTokenEndpoint from '@/server/api/endpoints/i/revoke-token.js';
+import ResolveMiniAppEndpoint from '@/server/api/endpoints/mini-apps/resolve.js';
 import { meta as notesShowMeta, paramDef as notesShowParamDef } from '@/server/api/endpoints/notes/show.js';
 import type { CacheService } from '@/core/CacheService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
@@ -31,6 +34,36 @@ const miniAppToken = { id: 'token1', miniAppOAuthGrantId: 'grant1' } as MiAccess
 const ordinaryToken = { id: 'token2', miniAppOAuthGrantId: null } as MiAccessToken;
 
 describe('Fediverse Mini App compatibility API', () => {
+	test('resolving a mini app records its canonical launch metadata for the current user', async () => {
+		const resolved = {
+			manifestUrl: 'https://farm.example/.well-known/fediverse-miniapp.json',
+			appOrigin: 'https://farm.example',
+			launchUrl: 'https://farm.example/from-note',
+			expiresAt: '2026-01-01T00:05:00.000Z',
+			manifest: {
+				homeUrl: 'https://farm.example/play',
+				name: 'Open Farm Game',
+				iconUrl: 'https://farm.example/icon.png',
+			},
+		} as unknown as ResolvedMiniAppManifest;
+		const resolveAppUrl = vi.fn(async () => resolved);
+		const recordResolved = vi.fn();
+		const endpoint = new ResolveMiniAppEndpoint(
+			{ resolveAppUrl } as unknown as MiniAppManifestService,
+			{ recordResolved } as unknown as UserMiniAppService,
+		);
+
+		await expect(endpoint.exec({ url: resolved.launchUrl }, user, null)).resolves.toBe(resolved);
+		expect(recordResolved).toHaveBeenCalledWith(user.id, expect.objectContaining({
+			manifestUrl: resolved.manifestUrl,
+			manifest: expect.objectContaining({
+				homeUrl: 'https://farm.example/play',
+				name: 'Open Farm Game',
+				iconUrl: 'https://farm.example/icon.png',
+			}),
+		}));
+	});
+
 	test('identity returns a same-origin profile only for mini app credentials', async () => {
 		const endpoint = new IdentityEndpoint(config);
 

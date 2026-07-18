@@ -6,9 +6,13 @@
 - Note: Fediverse Mini Apps の英語文言は Crowdin 同期までの暫定フォールバックです
 - Enhance: Fediverse Mini Apps を大きなフローティングウィンドウで開くように
 - Enhance: Fediverse Mini Apps をタイムライン上で自動検出するように
+- Enhance: 検出・登録した Fediverse Mini Apps を「もっと！」メニューから起動できるように
+- Fix: 「もっと！」メニューから Fediverse Mini App を再度開くと待機ダイアログが閉じない問題を修正
+- Fix: 「もっと！」メニューで Fediverse Mini App のアイコンとゲームパッドが重なって表示される問題を修正
 
 ### Server
 - Feat: Fediverse Mini Apps V1 向けのマニフェスト検証、OAuth、認証APIに対応
+- Enhance: ユーザーごとに検出・登録した Fediverse Mini Apps を記録するように
 
 ## 2026.7.0
 

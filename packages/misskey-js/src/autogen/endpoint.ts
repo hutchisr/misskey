@@ -487,6 +487,8 @@ import type {
 	MetaResponse,
 	MiauthGenTokenRequest,
 	MiauthGenTokenResponse,
+	MiniAppsListRequest,
+	MiniAppsListResponse,
 	MiniAppsResolveRequest,
 	MiniAppsResolveResponse,
 	MuteCreateRequest,
@@ -996,6 +998,7 @@ export type Endpoints = {
 	'invite/list': { req: InviteListRequest; res: InviteListResponse };
 	'meta': { req: MetaRequest; res: MetaResponse };
 	'miauth/gen-token': { req: MiauthGenTokenRequest; res: MiauthGenTokenResponse };
+	'mini-apps/list': { req: MiniAppsListRequest; res: MiniAppsListResponse };
 	'mini-apps/resolve': { req: MiniAppsResolveRequest; res: MiniAppsResolveResponse };
 	'mute/create': { req: MuteCreateRequest; res: EmptyResponse };
 	'mute/delete': { req: MuteDeleteRequest; res: EmptyResponse };

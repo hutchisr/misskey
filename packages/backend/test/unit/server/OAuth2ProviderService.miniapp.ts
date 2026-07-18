@@ -15,6 +15,7 @@ import type { CacheService } from '@/core/CacheService.js';
 import type { LoggerService } from '@/core/LoggerService.js';
 import type { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import type { MiniAppOAuthTokenService, MiniAppOAuthTokenResponse } from '@/core/MiniAppOAuthTokenService.js';
+import type { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import { OAuth2ProviderService } from '@/server/oauth/OAuth2ProviderService.js';
 
@@ -71,6 +72,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 	const issueAuthorization = vi.fn();
 	const refreshAuthorization = vi.fn();
 	const revoke = vi.fn();
+	const recordMiniApp = vi.fn();
 	const limit = vi.fn();
 
 	beforeAll(async () => {
@@ -88,6 +90,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			{} as HttpRequestService,
 			{ resolveManifestUrl } as unknown as MiniAppManifestService,
 			miniAppOAuthTokenService,
+			{ record: recordMiniApp } as unknown as UserMiniAppService,
 			{ limit } as unknown as RateLimiterService,
 			{
 				localUserByNativeTokenCache: {
@@ -129,6 +132,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		issueAuthorization.mockReset().mockResolvedValue({ grantId: 'grant1', response: tokenResponse });
 		refreshAuthorization.mockReset().mockResolvedValue(tokenResponse);
 		revoke.mockReset().mockResolvedValue(undefined);
+		recordMiniApp.mockReset().mockResolvedValue(undefined);
 		limit.mockReset().mockResolvedValue(null);
 	});
 
@@ -284,6 +288,13 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			clientName: 'Open Farm Game',
 			scope: ['identify', 'write'],
 		}));
+		expect(recordMiniApp).toHaveBeenCalledWith({
+			userId: 'user1',
+			manifestUrl,
+			launchUrl: resolvedManifest.manifest.homeUrl,
+			name: resolvedManifest.manifest.name,
+			iconUrl: resolvedManifest.manifest.iconUrl,
+		});
 	});
 
 	test('rejects a manifest-exceeding lifetime through a callback without iss', async () => {

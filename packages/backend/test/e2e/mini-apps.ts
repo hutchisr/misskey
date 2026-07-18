@@ -7,14 +7,16 @@ process.env.NODE_ENV = 'test';
 
 import * as assert from 'node:assert';
 import { afterAll, beforeAll, describe, test } from 'vitest';
-import { MiAccessToken } from '@/models/AccessToken.js';
 import { api, castAsError, initTestDb, origin, relativeFetch, signup } from '../utils.js';
 import type { DataSource } from 'typeorm';
 import type * as misskey from 'misskey-js';
+import { MiAccessToken } from '@/models/AccessToken.js';
+import { MiUserMiniApp } from '@/models/UserMiniApp.js';
 
 describe('Fediverse Mini Apps API', () => {
 	let db: DataSource;
 	let alice: misskey.entities.SignupResponse;
+	let bob: misskey.entities.SignupResponse;
 
 	const fullToken = 'a'.repeat(128);
 	const identifyToken = 'b'.repeat(128);
@@ -26,6 +28,7 @@ describe('Fediverse Mini Apps API', () => {
 	beforeAll(async () => {
 		db = await initTestDb(true);
 		alice = await signup({ username: 'miniapp_alice' });
+		bob = await signup({ username: 'miniapp_bob' });
 
 		const expiresAt = new Date(Date.now() + (60 * 60 * 1000));
 		await db.getRepository(MiAccessToken).insert([{
@@ -92,6 +95,64 @@ describe('Fediverse Mini Apps API', () => {
 
 			assert.strictEqual(res.status, 400);
 			assert.strictEqual(castAsError(res.body).error.code, 'MINI_APP_MANIFEST_UNAVAILABLE');
+		});
+	});
+
+	describe('mini-apps/list', () => {
+		beforeAll(async () => {
+			const older = new Date('2026-01-01T00:00:00.000Z');
+			const newer = new Date('2026-01-02T00:00:00.000Z');
+			await db.getRepository(MiUserMiniApp).insert([{
+				id: '1'.repeat(32),
+				userId: alice.id,
+				manifestUrl: 'https://older-miniapp.example/.well-known/fediverse-miniapp.json',
+				launchUrl: 'https://older-miniapp.example/',
+				name: 'Older Mini App',
+				iconUrl: null,
+				createdAt: older,
+				lastDiscoveredAt: older,
+			}, {
+				id: '2'.repeat(32),
+				userId: alice.id,
+				manifestUrl: 'https://newer-miniapp.example/.well-known/fediverse-miniapp.json',
+				launchUrl: 'https://newer-miniapp.example/play',
+				name: 'Newer Mini App',
+				iconUrl: 'https://newer-miniapp.example/icon.png',
+				createdAt: newer,
+				lastDiscoveredAt: newer,
+			}, {
+				id: '3'.repeat(32),
+				userId: bob.id,
+				manifestUrl: 'https://bob-miniapp.example/.well-known/fediverse-miniapp.json',
+				launchUrl: 'https://bob-miniapp.example/',
+				name: 'Bob Mini App',
+				iconUrl: null,
+				createdAt: newer,
+				lastDiscoveredAt: newer,
+			}]);
+		});
+
+		test('lists only the current user\'s apps, most recently discovered first', async () => {
+			const res = await api('mini-apps/list', { limit: 12 }, alice);
+
+			assert.strictEqual(res.status, 200);
+			assert.deepStrictEqual(res.body.map(app => app.name), ['Newer Mini App', 'Older Mini App']);
+			assert.strictEqual(res.body[0].iconUrl, 'https://newer-miniapp.example/icon.png');
+		});
+
+		test('honors the requested limit', async () => {
+			const res = await api('mini-apps/list', { limit: 1 }, alice);
+
+			assert.strictEqual(res.status, 200);
+			assert.strictEqual(res.body.length, 1);
+			assert.strictEqual(res.body[0].name, 'Newer Mini App');
+		});
+
+		test('requires an authenticated user', async () => {
+			const res = await api('mini-apps/list', { limit: 12 });
+
+			assert.strictEqual(res.status, 400);
+			assert.strictEqual(castAsError(res.body as unknown as Record<string, unknown>).error.code, 'ACCESS_DENIED');
 		});
 	});
 

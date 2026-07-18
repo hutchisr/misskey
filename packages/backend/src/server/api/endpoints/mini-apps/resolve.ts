@@ -5,6 +5,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { MiniAppManifestError, MiniAppManifestService } from '@/core/MiniAppManifestService.js';
+import { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { ApiError } from '@/server/api/error.js';
 
@@ -217,10 +218,13 @@ export const paramDef = {
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
 		private miniAppManifestService: MiniAppManifestService,
+		private userMiniAppService: UserMiniAppService,
 	) {
-		super(meta, paramDef, async (ps) => {
+		super(meta, paramDef, async (ps, me) => {
 			try {
-				return await this.miniAppManifestService.resolveAppUrl(ps.url);
+				const resolved = await this.miniAppManifestService.resolveAppUrl(ps.url);
+				await this.userMiniAppService.recordResolved(me.id, resolved);
+				return resolved;
 			} catch (error) {
 				if (!(error instanceof MiniAppManifestError)) throw error;
 

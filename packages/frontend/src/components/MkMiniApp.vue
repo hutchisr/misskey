@@ -21,19 +21,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 </div>
 </template>
 
-<script lang="ts">
-import { reactive } from 'vue';
-
-const openedMiniAppManifests = reactive(new Set<string>());
-</script>
-
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
 import MkButton from '@/components/MkButton.vue';
-import MkMiniAppWindow from '@/components/MkMiniAppWindow.vue';
 import { i18n } from '@/i18n.js';
-import * as os from '@/os.js';
+import { openFediverseMiniApp, openedFediverseMiniAppManifests } from '@/utility/open-fediverse-miniapp.js';
 
 const props = withDefaults(defineProps<{
 	resolved: ResolvedFediverseMiniApp;
@@ -47,24 +40,14 @@ const emit = defineEmits<{
 	(ev: 'closed'): void;
 }>();
 
-const windowOpened = computed(() => openedMiniAppManifests.has(props.resolved.manifestUrl));
+const windowOpened = computed(() => openedFediverseMiniAppManifests.has(props.resolved.manifestUrl));
 const appHostname = computed(() => new URL(props.resolved.appOrigin).hostname);
 
 function openWindow(): void {
-	if (windowOpened.value) return;
-
-	const manifestUrl = props.resolved.manifestUrl;
-	openedMiniAppManifests.add(manifestUrl);
-	const { dispose } = os.popup(MkMiniAppWindow, {
-		resolved: props.resolved,
-	}, {
-		closed: () => {
-			openedMiniAppManifests.delete(manifestUrl);
-			dispose();
-			emit('closed');
-		},
+	openFediverseMiniApp(props.resolved, {
+		onOpened: () => emit('open'),
+		onClosed: () => emit('closed'),
 	});
-	emit('open');
 }
 </script>
 
