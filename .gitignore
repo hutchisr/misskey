@@ -85,3 +85,4 @@ vite.config.local-dev.ts.timestamp-*
 *.af~lock~
 .agents
 .codex
+fluent-emojis/
