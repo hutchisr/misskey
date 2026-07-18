@@ -123,6 +123,7 @@ describe('MkUrlPreview', () => {
 
 		await mkUrlPreview.findAllByText('Open Farm Game');
 		assert.strictEqual(mkUrlPreview.getAllByRole('button').length, 1);
+		mkUrlPreview.getByRole('button', { name: 'Open mini app' });
 		assert.notExists(mkUrlPreview.container.querySelector('iframe'));
 	});
 
@@ -140,7 +141,7 @@ describe('MkUrlPreview', () => {
 			return new URL(requestUrl, window.location.href).pathname === '/api/mini-apps/resolve';
 		}));
 
-		mkUrlPreview.getByRole('button').click();
+		mkUrlPreview.getByRole('button', { name: 'Check for mini app' }).click();
 		await waitFor(() => {
 			assert.isTrue(fetchMock.mock.calls.some(([request]) => {
 				const requestUrl = typeof request === 'string' ? request : 'url' in request ? request.url : request.toString();

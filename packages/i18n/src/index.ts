@@ -10,6 +10,7 @@
 import * as fs from 'node:fs';
 import { load as loadYaml } from 'js-yaml';
 import { languages, primaries } from './const.js';
+import { enUsFallback } from './fallbacks/en-US.js';
 import type { Locale } from './autogen/locale.js';
 import type { ILocale, ParameterizedString } from './types.js';
 
@@ -67,6 +68,11 @@ function build(): Record<Language, Locale> {
 	}, {} as Locales);
 
 	removeEmpty(locales);
+
+	// TODO(Crowdin): TEMPORARY FORK-ONLY FALLBACK. Remove this merge and
+	// fallbacks/en-US.ts after Crowdin synchronizes the Mini Apps keys.
+	// Crowdin is last so its translations always take precedence in the meantime.
+	locales['en-US'] = merge(enUsFallback, locales['en-US']);
 
 	return Object.entries(locales).reduce<Record<Language, Locale>>((a, [k, v]) => {
 		const lang = k.split('-')[0];
