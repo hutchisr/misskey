@@ -37,6 +37,7 @@ import { IdService } from './IdService.js';
 import { ImageProcessingService } from './ImageProcessingService.js';
 import { MiniAppManifestService } from './MiniAppManifestService.js';
 import { MiniAppOAuthTokenService } from './MiniAppOAuthTokenService.js';
+import { UserMiniAppService } from './UserMiniAppService.js';
 import { SystemAccountService } from './SystemAccountService.js';
 import { InternalStorageService } from './InternalStorageService.js';
 import { MetaService } from './MetaService.js';
@@ -796,6 +797,7 @@ const $ApQuestionService: Provider = {
 		ImageProcessingService,
 		MiniAppManifestService,
 		MiniAppOAuthTokenService,
+		UserMiniAppService,
 		InternalStorageService,
 		MetaService,
 		MfmService,
@@ -1108,6 +1110,7 @@ const $ApQuestionService: Provider = {
 		ImageProcessingService,
 		MiniAppManifestService,
 		MiniAppOAuthTokenService,
+		UserMiniAppService,
 		InternalStorageService,
 		MetaService,
 		MfmService,

@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { watch, useTemplateRef } from 'vue';
+import { onMounted, watch, useTemplateRef } from 'vue';
 import MkModal from '@/components/MkModal.vue';
 
 const modal = useTemplateRef('modal');
@@ -30,12 +30,22 @@ const emit = defineEmits<{
 	(ev: 'closed'): void;
 }>();
 
+let doneCalled = false;
+
 function done() {
+	if (doneCalled) return;
+	doneCalled = true;
 	emit('done');
 	modal.value?.close();
 }
 
 watch(() => props.showing, () => {
+	if (!props.showing) done();
+});
+
+onMounted(() => {
+	// A cached promise can finish before this dialog mounts, so the watcher above
+	// will not observe a transition. Close immediately in that case.
 	if (!props.showing) done();
 });
 </script>

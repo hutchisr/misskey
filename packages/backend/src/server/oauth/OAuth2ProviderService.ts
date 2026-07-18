@@ -29,6 +29,7 @@ import { StatusError } from '@/misc/status-error.js';
 import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import { OAuthPage } from '@/server/web/views/oauth.js';
 import { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
+import { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import {
 	AccessDeniedError,
@@ -110,6 +111,7 @@ interface ClientInformation {
 	redirectUris: string[];
 	name: string;
 	logo: string | null;
+	miniAppHomeUrl?: string;
 }
 
 interface OAuthRequestParameters {
@@ -468,6 +470,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private httpRequestService: HttpRequestService,
 		private miniAppManifestService: MiniAppManifestService,
 		private miniAppOAuthTokenService: MiniAppOAuthTokenService,
+		private userMiniAppService: UserMiniAppService,
 		private rateLimiterService: RateLimiterService,
 		private cacheService: CacheService,
 		private htmlTemplateService: HtmlTemplateService,
@@ -562,6 +565,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					redirectUris: [...resolved.manifest.oauth.redirectUris],
 					name: resolved.manifest.name,
 					logo: resolved.manifest.iconUrl,
+					miniAppHomeUrl: resolved.manifest.homeUrl,
 				},
 				clientKind: 'miniapp',
 				clientId: resolved.manifestUrl,
@@ -840,6 +844,18 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 
 				this.#logger.info(`Checking the user before sending authorization code to ${transaction.client.id}`);
 				const user = await this.#findUserByLoginToken(loginToken);
+				if (transaction.request.clientKind === 'miniapp') {
+					if (transaction.client.miniAppHomeUrl == null) {
+						throw new InvalidRequestError('Missing mini app home URL');
+					}
+					await this.userMiniAppService.record({
+						userId: user.id,
+						manifestUrl: transaction.client.id,
+						launchUrl: transaction.client.miniAppHomeUrl,
+						name: transaction.client.name,
+						iconUrl: transaction.client.logo,
+					});
+				}
 
 				this.#logger.info(`Sending authorization code on behalf of user ${user.id} to ${transaction.client.id} through ${transaction.request.redirectUri}, with scope: [${transaction.request.scopes}]`);
 				if (transaction.request.clientKind === 'miniapp' && transaction.request.authorizationLifetimeSeconds == null) {
