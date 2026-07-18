@@ -1,0 +1,62 @@
+/*
+ * SPDX-FileCopyrightText: syuilo and misskey-project
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { Inject, Injectable } from '@nestjs/common';
+import type { Config } from '@/config.js';
+import { DI } from '@/di-symbols.js';
+import { Endpoint } from '@/server/api/endpoint-base.js';
+import { ApiError } from '@/server/api/error.js';
+
+export const meta = {
+	tags: ['account'],
+	requireCredential: true,
+	kind: 'identify',
+	allowMiniAppCredential: true,
+	allowGet: true,
+	errors: {
+		miniAppCredentialRequired: {
+			message: 'A mini app OAuth credential is required.',
+			code: 'MINI_APP_CREDENTIAL_REQUIRED',
+			id: '0d5449b5-424c-40b5-ac87-528f156440e1',
+			httpStatusCode: 403,
+		},
+	},
+
+	res: {
+		type: 'object',
+		optional: false, nullable: false,
+		properties: {
+			id: { type: 'string', optional: false, nullable: false },
+			username: { type: 'string', optional: false, nullable: false },
+			url: { type: 'string', optional: false, nullable: false },
+		},
+	},
+} as const;
+
+export const paramDef = {
+	type: 'object',
+	properties: {},
+	required: [],
+} as const;
+
+@Injectable()
+export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
+	constructor(
+		@Inject(DI.config)
+		private config: Config,
+	) {
+		super(meta, paramDef, async (_ps, me, token) => {
+			if (token?.miniAppOAuthGrantId == null) {
+				throw new ApiError(meta.errors.miniAppCredentialRequired);
+			}
+
+			return {
+				id: new URL(`/users/${me.id}`, this.config.url).toString(),
+				username: me.username,
+				url: new URL(`/@${me.username}`, this.config.url).toString(),
+			};
+		});
+	}
+}

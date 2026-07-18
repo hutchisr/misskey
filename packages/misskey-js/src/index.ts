@@ -7,6 +7,7 @@ export {
 };
 
 export const permissions = consts.permissions;
+export const miniAppPermissions = consts.miniAppPermissions;
 export const notificationTypes = consts.notificationTypes;
 export const noteVisibilities = consts.noteVisibilities;
 export const mutedNoteReasons = consts.mutedNoteReasons;

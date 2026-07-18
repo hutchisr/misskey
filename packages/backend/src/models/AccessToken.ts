@@ -87,4 +87,16 @@ export class MiAccessToken {
 		default: false,
 	})
 	public fetched: boolean;
+
+	@Index()
+	@Column({
+		...id(),
+		nullable: true,
+	})
+	public miniAppOAuthGrantId: string | null;
+
+	@Column('timestamp with time zone', {
+		nullable: true,
+	})
+	public expiresAt: Date | null;
 }

@@ -10,6 +10,7 @@ import { ApiCallService } from './api/ApiCallService.js';
 import { FileServerService } from './FileServerService.js';
 import { HealthServerService } from './HealthServerService.js';
 import { NodeinfoServerService } from './NodeinfoServerService.js';
+import { MiniAppServerService } from './MiniAppServerService.js';
 import { ServerService } from './ServerService.js';
 import { WellKnownServerService } from './WellKnownServerService.js';
 import { GetterService } from './api/GetterService.js';
@@ -66,6 +67,7 @@ import { SigninWithPasskeyApiService } from './api/SigninWithPasskeyApiService.j
 		UrlPreviewService,
 		ActivityPubServerService,
 		FileServerService,
+		MiniAppServerService,
 		NodeinfoServerService,
 		ServerService,
 		WellKnownServerService,

@@ -38,6 +38,7 @@ import { MiGalleryPost } from '@/models/GalleryPost.js';
 import { MiHashtag } from '@/models/Hashtag.js';
 import { MiInstance } from '@/models/Instance.js';
 import { MiMeta } from '@/models/Meta.js';
+import { MiMiniAppOAuthRefreshToken } from '@/models/MiniAppOAuthRefreshToken.js';
 import { MiModerationLog } from '@/models/ModerationLog.js';
 import { MiMuting } from '@/models/Muting.js';
 import { MiRenoteMuting } from '@/models/RenoteMuting.js';
@@ -186,6 +187,7 @@ export const entities = [
 	MiAvatarDecoration,
 	MiAuthSession,
 	MiAccessToken,
+	MiMiniAppOAuthRefreshToken,
 	MiUser,
 	MiUserProfile,
 	MiUserKeypair,

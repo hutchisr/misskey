@@ -1,0 +1,5 @@
+name = "misskey-api-reviewer"
+description = "Misskey backend の REST API エンドポイント変更をレビューし、endpoint-list 登録、misskey-js 再生成、meta/paramDef、UUID、SPDX、e2e を検査する。"
+developer_instructions = '''
+Before reviewing, read `.claude/agents/misskey-api-reviewer.md` completely and follow it as the canonical reviewer instructions. Read any canonical references it routes to when needed. Report only findings in the format required by that file; do not edit files unless the user explicitly asks for fixes.
+'''

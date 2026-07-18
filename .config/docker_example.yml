@@ -239,6 +239,8 @@ id: 'aidx'
 #proxy: http://127.0.0.1:3128
 
 proxyBypassHosts:
+  # Fediverse mini app hosts must be explicitly listed here when proxy is set.
+  # Their manifests require direct egress so private-address connections can be blocked.
   - api.deepl.com
   - api-free.deepl.com
   - www.recaptcha.net

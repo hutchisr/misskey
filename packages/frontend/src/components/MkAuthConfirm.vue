@@ -128,7 +128,7 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 const props = defineProps<{
 	name?: string;
 	icon?: string;
-	permissions?: (typeof Misskey.permissions[number])[];
+	permissions?: ((typeof Misskey.permissions)[number] | (typeof Misskey.miniAppPermissions)[number])[];
 	manualWaiting?: boolean;
 	waitOnDeny?: boolean;
 }>();

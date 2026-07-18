@@ -7,6 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { AccessTokensRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
+import { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
 
 export const meta = {
 	requireCredential: true,
@@ -38,26 +39,21 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	constructor(
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
+
+		private miniAppOAuthTokenService: MiniAppOAuthTokenService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			if ('tokenId' in ps) {
-				const tokenExist = await this.accessTokensRepository.exists({ where: { id: ps.tokenId } });
+			const accessToken = 'tokenId' in ps
+				? await this.accessTokensRepository.findOneBy({ id: ps.tokenId, userId: me.id })
+				: ps.token
+					? await this.accessTokensRepository.findOneBy({ token: ps.token, userId: me.id })
+					: null;
+			if (accessToken == null) return;
 
-				if (tokenExist) {
-					await this.accessTokensRepository.delete({
-						id: ps.tokenId,
-						userId: me.id,
-					});
-				}
-			} else if (ps.token) {
-				const tokenExist = await this.accessTokensRepository.exists({ where: { token: ps.token } });
-
-				if (tokenExist) {
-					await this.accessTokensRepository.delete({
-						token: ps.token,
-						userId: me.id,
-					});
-				}
+			if (accessToken.miniAppOAuthGrantId != null) {
+				await this.miniAppOAuthTokenService.revokeGrant(accessToken.miniAppOAuthGrantId);
+			} else {
+				await this.accessTokensRepository.delete(accessToken.id);
 			}
 		});
 	}

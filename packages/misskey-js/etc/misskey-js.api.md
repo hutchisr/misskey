@@ -2021,6 +2021,8 @@ declare namespace entities {
         MetaResponse,
         MiauthGenTokenRequest,
         MiauthGenTokenResponse,
+        MiniAppsResolveRequest,
+        MiniAppsResolveResponse,
         MuteCreateRequest,
         MuteDeleteRequest,
         MuteListRequest,
@@ -2196,6 +2198,9 @@ declare namespace entities {
         UsersShowRequest,
         UsersShowResponse,
         UsersUpdateMemoRequest,
+        V1MiniAppsIdentityResponse,
+        V1StatusesRequest,
+        V1StatusesResponse,
         V2AdminEmojiListRequest,
         V2AdminEmojiListResponse,
         VerifyEmailRequest,
@@ -2886,6 +2891,15 @@ type MiauthGenTokenResponse = operations['miauth___gen-token']['responses']['200
 
 // Warning: (ae-forgotten-export) The symbol "ModerationLogPayloads" needs to be exported by the entry point index.d.ts
 //
+// @public (undocumented)
+export const miniAppPermissions: readonly ["identify", "write"];
+
+// @public (undocumented)
+type MiniAppsResolveRequest = operations['mini-apps___resolve']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type MiniAppsResolveResponse = operations['mini-apps___resolve']['responses']['200']['content']['application/json'];
+
 // @public (undocumented)
 type ModerationLog = {
     id: ID;
@@ -3758,6 +3772,15 @@ type UsersUpdateMemoRequest = operations['users___update-memo']['requestBody']['
 
 // @public (undocumented)
 type UserWebhook = components['schemas']['UserWebhook'];
+
+// @public (undocumented)
+type V1MiniAppsIdentityResponse = operations['v1___mini-apps___identity']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type V1StatusesRequest = operations['v1___statuses']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type V1StatusesResponse = operations['v1___statuses']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type V2AdminEmojiListRequest = operations['v2___admin___emoji___list']['requestBody']['content']['application/json'];
