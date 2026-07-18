@@ -3,13 +3,43 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { describe, test, assert, afterEach } from 'vitest';
+import { describe, test, assert, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, waitFor, type RenderResult } from '@testing-library/vue';
 import type { SummalyResult } from '@misskey-dev/summaly';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 import MkUrlPreview from '@/components/MkUrlPreview.vue';
 import { popups } from '@/os.js';
+
+const resolveFediverseMiniAppMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/utility/resolve-fediverse-miniapp.js', () => ({
+	resolveFediverseMiniApp: resolveFediverseMiniAppMock,
+}));
+
+const nativeIntersectionObserver = globalThis.IntersectionObserver;
+const intersectionObservers: Array<{ callback: IntersectionObserverCallback; observer: IntersectionObserver }> = [];
+
+class TestIntersectionObserver implements IntersectionObserver {
+	public readonly root = null;
+	public readonly rootMargin = '0px';
+	public readonly thresholds = [0];
+
+	constructor(callback: IntersectionObserverCallback) {
+		intersectionObservers.push({ callback, observer: this });
+	}
+
+	public disconnect(): void {}
+	public observe(): void {}
+	public takeRecords(): IntersectionObserverEntry[] { return []; }
+	public unobserve(): void {}
+}
+
+function showObservedPreviews(): void {
+	for (const { callback, observer } of intersectionObservers) {
+		callback([{ isIntersecting: true } as IntersectionObserverEntry], observer);
+	}
+}
 
 describe('MkUrlPreview', () => {
 	const renderPreviewBy = async (
@@ -26,16 +56,11 @@ describe('MkUrlPreview', () => {
 			};
 		}
 
+		resolveFediverseMiniAppMock.mockResolvedValue(miniAppResponse ?? null);
 		fetchMock.mockIf((req) => {
 			const url = new URL(req.url);
-			return url.pathname === '/api/mini-apps/resolve' || url.pathname === '/url';
+			return url.pathname === '/url';
 		}, (req) => {
-			const url = new URL(req.url);
-			if (url.pathname === '/api/mini-apps/resolve') {
-				return miniAppResponse == null
-					? { status: 404 }
-					: { status: 200, body: JSON.stringify(miniAppResponse) };
-			}
 			return {
 				status: 200,
 				body: JSON.stringify(summary),
@@ -68,10 +93,17 @@ describe('MkUrlPreview', () => {
 		return mkUrlPreview.container.querySelector('iframe');
 	};
 
+	beforeEach(() => {
+		intersectionObservers.length = 0;
+		globalThis.IntersectionObserver = TestIntersectionObserver;
+		resolveFediverseMiniAppMock.mockReset();
+	});
+
 	afterEach(() => {
 		fetchMock.resetMocks();
 		cleanup();
 		popups.value = [];
+		globalThis.IntersectionObserver = nativeIntersectionObserver;
 	});
 
 	test('Should render the description', async () => {
@@ -131,27 +163,58 @@ describe('MkUrlPreview', () => {
 		popups.value[0].events.closed();
 	});
 
-	test('A compact timeline preview discovers a Mini App only after its explicit action', async () => {
+	test('A compact timeline preview automatically discovers a Mini App when visible', async () => {
+		const appOrigin = 'https://visible-miniapp.example';
 		const mkUrlPreview = await renderPreviewBy({
-			url: 'https://example.local/',
+			url: `${appOrigin}/farm`,
 			description: 'Mocked description',
-		}, undefined, {
+		}, {
+			manifestUrl: `${appOrigin}/.well-known/fediverse-miniapp.json`,
+			appOrigin,
+			launchUrl: `${appOrigin}/farm`,
+			expiresAt: '2099-01-01T00:00:00.000Z',
+			manifest: {
+				version: '1',
+				name: 'Visible Farm Game',
+				publisher: {
+					name: 'Visible Farm Game',
+					url: `${appOrigin}/about`,
+				},
+				homeUrl: `${appOrigin}/`,
+				iconUrl: `${appOrigin}/icon.png`,
+				splash: {
+					imageUrl: `${appOrigin}/splash.png`,
+					backgroundColor: '#173f2b',
+				},
+				oauth: {
+					redirectUris: [`${appOrigin}/oauth/callback`],
+					scopes: ['identify', 'write'],
+					scopeAuthorizationMaxAgeSeconds: {
+						identify: 31_536_000,
+						write: 31_536_000,
+					},
+				},
+				activityPub: {
+					actorUrl: `${appOrigin}/ap/actor`,
+					publicNotes: true,
+					transactionalMentions: false,
+				},
+				capabilities: [],
+				cacheTtlSeconds: 300,
+			},
+		}, {
 			compact: true,
 			detail: false,
 		});
 
-		assert.isFalse(fetchMock.mock.calls.some(([request]) => {
-			const requestUrl = typeof request === 'string' ? request : 'url' in request ? request.url : request.toString();
-			return new URL(requestUrl, window.location.href).pathname === '/api/mini-apps/resolve';
-		}));
+		assert.strictEqual(resolveFediverseMiniAppMock.mock.calls.length, 0);
+		assert.notExists(mkUrlPreview.queryByRole('button', { name: 'Check for mini app' }));
 
-		mkUrlPreview.getByRole('button', { name: 'Check for mini app' }).click();
+		showObservedPreviews();
+		await mkUrlPreview.findByText('Visible Farm Game');
 		await waitFor(() => {
-			assert.isTrue(fetchMock.mock.calls.some(([request]) => {
-				const requestUrl = typeof request === 'string' ? request : 'url' in request ? request.url : request.toString();
-				return new URL(requestUrl, window.location.href).pathname === '/api/mini-apps/resolve';
-			}));
-			assert.notExists(mkUrlPreview.queryByRole('button'));
+			assert.strictEqual(resolveFediverseMiniAppMock.mock.calls.length, 1);
+			mkUrlPreview.getByRole('button', { name: 'Open mini app' });
 		});
 	});
 
