@@ -44,7 +44,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</MkButton>
 	</div>
 </template>
-<div v-else>
+<div v-else v-appear="discoverMiniAppOnAppear">
 	<component :is="self ? 'MkA' : 'a'" :class="[$style.link, { [$style.compact]: compact }]" :[attr]="maybeRelativeUrl" rel="nofollow noopener" :target="target" :title="url">
 		<div v-if="thumbnail && !sensitive" :class="$style.thumbnail" :style="prefer.s.dataSaver.urlPreviewThumbnail ? '' : { backgroundImage: `url('${thumbnail}')` }">
 		</div>
@@ -66,11 +66,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</article>
 	</component>
 	<template v-if="showActions">
-		<div v-if="miniAppDiscoveryAvailable" :class="$style.action">
-			<MkButton :small="true" inline :wait="miniAppResolving" @click="discoverMiniApp(true)">
-				<i class="ti ti-device-gamepad-2"></i> {{ i18n.ts._miniApps.check }}
-			</MkButton>
-		</div>
 		<div v-if="tweetId" :class="$style.action">
 			<MkButton :small="true" inline @click="tweetExpanded = true">
 				<i class="ti ti-brand-x"></i> {{ i18n.ts.expandTweet }}
@@ -139,8 +134,7 @@ const embedId = `embed${Math.random().toString().replace(/\D/, '')}`;
 const tweetHeight = ref(150);
 const unknownUrl = ref(false);
 const miniApp = shallowRef<ResolvedFediverseMiniApp | null>(null);
-const miniAppResolving = ref(false);
-const miniAppDiscoveryAvailable = ref(props.showActions && props.compact && !props.detail);
+const miniAppDiscoveryAttempted = ref(false);
 const miniAppAbortController = new AbortController();
 
 onDeactivated(() => {
@@ -150,26 +144,24 @@ onDeactivated(() => {
 const requestUrl = new URL(props.url, window.location.href);
 if (!['http:', 'https:'].includes(requestUrl.protocol)) throw new Error('invalid url');
 const miniAppRequestUrl = requestUrl.href;
+const discoverMiniAppOnAppear = props.showActions && props.compact && !props.detail ? discoverMiniApp : null;
 
-// Avoid turning ordinary timeline scrolling into an outbound manifest-fetch amplifier.
+// Detail and non-compact previews resolve immediately. Compact timeline previews
+// wait until they enter the viewport so off-screen links do not create requests.
 if (props.showActions && (props.detail || !props.compact)) {
-	void discoverMiniApp(false);
+	void discoverMiniApp();
 }
 
-async function discoverMiniApp(hideActionOnFailure: boolean): Promise<void> {
-	if (miniAppResolving.value) return;
-	miniAppResolving.value = true;
+async function discoverMiniApp(): Promise<void> {
+	if (miniAppDiscoveryAttempted.value || miniApp.value != null) return;
+	miniAppDiscoveryAttempted.value = true;
 	try {
 		const resolved = await resolveFediverseMiniApp(miniAppRequestUrl, miniAppAbortController.signal);
 		if (resolved != null) {
 			miniApp.value = resolved;
-		} else if (hideActionOnFailure) {
-			miniAppDiscoveryAvailable.value = false;
 		}
 	} catch {
-		if (hideActionOnFailure) miniAppDiscoveryAvailable.value = false;
-	} finally {
-		miniAppResolving.value = false;
+		// A normal URL or an aborted preview silently remains a URL preview.
 	}
 }
 
