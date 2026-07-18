@@ -166,10 +166,11 @@ describe('MkMiniApp authorization gate', () => {
 
 		const prompt = await view.findByRole('alertdialog');
 		expect(prompt.getAttribute('aria-modal')).toBe('true');
+		expect(view.getByText('Continue signing in to Open Farm Game?')).toBeTruthy();
 		expect(frame.parentElement?.hasAttribute('inert')).toBe(true);
 		expect(frame.parentElement?.getAttribute('aria-hidden')).toBe('true');
 		expect(mocks.authorize).not.toHaveBeenCalled();
-		const authorizeButton = view.getByRole('button', { name: 'ログインを続ける' });
+		const authorizeButton = view.getByRole('button', { name: 'Continue signing in' });
 		const cancelButton = view.getByRole('button', { name: /Cancel|キャンセル/ });
 		await nextTick();
 		expect(window.document.activeElement).toBe(authorizeButton);
