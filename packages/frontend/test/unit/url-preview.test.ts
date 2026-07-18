@@ -9,6 +9,7 @@ import type { SummalyResult } from '@misskey-dev/summaly';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 import MkUrlPreview from '@/components/MkUrlPreview.vue';
+import { popups } from '@/os.js';
 
 describe('MkUrlPreview', () => {
 	const renderPreviewBy = async (
@@ -70,6 +71,7 @@ describe('MkUrlPreview', () => {
 	afterEach(() => {
 		fetchMock.resetMocks();
 		cleanup();
+		popups.value = [];
 	});
 
 	test('Should render the description', async () => {
@@ -123,8 +125,10 @@ describe('MkUrlPreview', () => {
 
 		await mkUrlPreview.findAllByText('Open Farm Game');
 		assert.strictEqual(mkUrlPreview.getAllByRole('button').length, 1);
-		mkUrlPreview.getByRole('button', { name: 'Open mini app' });
+		mkUrlPreview.getByRole('button', { name: 'Open mini app' }).click();
 		assert.notExists(mkUrlPreview.container.querySelector('iframe'));
+		assert.strictEqual(popups.value.length, 1);
+		popups.value[0].events.closed();
 	});
 
 	test('A compact timeline preview discovers a Mini App only after its explicit action', async () => {

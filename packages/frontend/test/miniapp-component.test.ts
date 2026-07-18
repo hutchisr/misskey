@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { nextTick } from 'vue';
+import { defineComponent, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/vue';
 import './init';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 import MkMiniApp from '@/components/MkMiniApp.vue';
+import MkMiniAppWindow from '@/components/MkMiniAppWindow.vue';
+import MkWindow from '@/components/MkWindow.vue';
+import { popups } from '@/os.js';
 import type { ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
 
 const mocks = vi.hoisted(() => ({
@@ -78,9 +81,83 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	mocks.authorize.mockReset();
 	hostPort = null;
+	popups.value = [];
 });
 
-describe('MkMiniApp authorization gate', () => {
+describe('MkWindow close lifecycle', () => {
+	test('allows a close handler to call close again without recursion', async () => {
+		const closeEvents = vi.fn();
+		const ReentrantWindow = defineComponent({
+			components: { MkWindow },
+			setup() {
+				const windowEl = ref<InstanceType<typeof MkWindow> | null>(null);
+				function onClose(): void {
+					closeEvents();
+					windowEl.value?.close();
+				}
+				return { onClose, windowEl };
+			},
+			template: '<MkWindow ref="windowEl" @close="onClose"><span>Window content</span></MkWindow>',
+		});
+		const view = render(ReentrantWindow, {
+			global: { components, directives },
+		});
+		const closeButton = Array.from(view.container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.querySelector('.ti-x') != null);
+
+		expect(closeButton).toBeDefined();
+		await fireEvent.click(closeButton!);
+
+		expect(closeEvents).toHaveBeenCalledOnce();
+	});
+});
+
+describe('MkMiniApp launcher', () => {
+	test('opens one Mini App window in the global popup host', async () => {
+		const view = render(MkMiniApp, {
+			props: { resolved },
+			global: { components, directives },
+		});
+		const openButton = view.getByRole('button', { name: 'Open mini app' });
+
+		await fireEvent.click(openButton);
+
+		expect(popups.value).toHaveLength(1);
+		expect(popups.value[0].component).toBe(MkMiniAppWindow);
+		expect(popups.value[0].props.resolved).toStrictEqual(resolved);
+		expect(view.emitted('open')).toHaveLength(1);
+		expect((openButton as HTMLButtonElement).disabled).toBe(true);
+
+		await fireEvent.click(openButton);
+		expect(popups.value).toHaveLength(1);
+
+		popups.value[0].events.closed();
+		await nextTick();
+		expect(popups.value).toHaveLength(0);
+		expect(view.emitted('closed')).toHaveLength(1);
+		expect((openButton as HTMLButtonElement).disabled).toBe(false);
+
+		await fireEvent.click(openButton);
+		expect(popups.value).toHaveLength(1);
+
+		view.unmount();
+		const remountedView = render(MkMiniApp, {
+			props: { resolved },
+			global: { components, directives },
+		});
+		const remountedOpenButton = remountedView.getByRole('button', { name: 'Open mini app' });
+		expect((remountedOpenButton as HTMLButtonElement).disabled).toBe(true);
+		await fireEvent.click(remountedOpenButton);
+		expect(popups.value).toHaveLength(1);
+
+		popups.value[0].events.closed();
+		await nextTick();
+
+		expect(popups.value).toHaveLength(0);
+		expect((remountedOpenButton as HTMLButtonElement).disabled).toBe(false);
+	});
+});
+
+describe('MkMiniAppWindow authorization gate', () => {
 	test('refuses to create an iframe for an app on the Misskey origin', async () => {
 		const sameOrigin = window.location.origin;
 		const sameOriginResolved: ResolvedFediverseMiniApp = {
@@ -89,14 +166,15 @@ describe('MkMiniApp authorization gate', () => {
 			launchUrl: `${sameOrigin}/mini-app`,
 			manifestUrl: `${sameOrigin}/.well-known/fediverse-miniapp.json`,
 		};
-		const view = render(MkMiniApp, {
+		const view = render(MkMiniAppWindow, {
 			props: { resolved: sameOriginResolved },
 			global: { components, directives },
 		});
 
-		await fireEvent.click(view.getByRole('button'));
 		await nextTick();
 
+		const windowRoot = view.container.firstElementChild as HTMLElement;
+		expect(windowRoot.querySelector('.ti-rectangle')).not.toBeNull();
 		expect(view.container.querySelector('iframe')).toBeNull();
 		expect(view.getByRole('alert')).toBeTruthy();
 	});
@@ -119,7 +197,7 @@ describe('MkMiniApp authorization gate', () => {
 			return new Promise(() => {});
 		});
 
-		const view = render(MkMiniApp, {
+		const view = render(MkMiniAppWindow, {
 			props: { resolved },
 			global: {
 				components,
@@ -127,8 +205,9 @@ describe('MkMiniApp authorization gate', () => {
 			},
 		});
 
-		await fireEvent.click(view.getByRole('button'));
 		const frame = await view.findByTitle('Open Farm Game') as HTMLIFrameElement;
+		const closeButton = (): HTMLButtonElement | null => Array.from(view.container.querySelectorAll<HTMLButtonElement>('button')).find(button => button.querySelector('.ti-x') != null) ?? null;
+		expect(closeButton()).not.toBeNull();
 		await fireEvent.load(frame);
 		expect(hostPort).not.toBeNull();
 		const bootstrap = postMessage.mock.calls.at(-1)?.[0] as { launchId?: unknown } | undefined;
@@ -166,6 +245,7 @@ describe('MkMiniApp authorization gate', () => {
 
 		const prompt = await view.findByRole('alertdialog');
 		expect(prompt.getAttribute('aria-modal')).toBe('true');
+		expect(closeButton()).toBeNull();
 		expect(view.getByText('Continue signing in to Open Farm Game?')).toBeTruthy();
 		expect(frame.parentElement?.hasAttribute('inert')).toBe(true);
 		expect(frame.parentElement?.getAttribute('aria-hidden')).toBe('true');
@@ -203,6 +283,7 @@ describe('MkMiniApp authorization gate', () => {
 		await nextTick();
 		await nextTick();
 		expect(frame.parentElement?.hasAttribute('inert')).toBe(false);
+		expect(closeButton()).not.toBeNull();
 		expect(window.document.activeElement).toBe(frame);
 
 		hostPort!.postMessage.mockClear();
@@ -222,5 +303,27 @@ describe('MkMiniApp authorization gate', () => {
 		});
 		await nextTick();
 		expect(window.document.activeElement).toBe(frame);
+
+		hostPort!.postMessage.mockClear();
+		now = 23_000;
+		hostPort!.onmessage?.({ data: authRequestEnvelope } as MessageEvent);
+		const escapePrompt = await view.findByRole('alertdialog');
+		await fireEvent.keyDown(escapePrompt, { key: 'Escape' });
+		await nextTick();
+		expect(view.queryByRole('alertdialog')).toBeNull();
+		expect(hostPort!.postMessage).toHaveBeenCalledWith({
+			type: 'authResult',
+			version: '1',
+			launchId,
+			requestId: 'r'.repeat(22),
+			status: 'cancelled',
+		});
+		expect(view.queryByTitle('Open Farm Game')).not.toBeNull();
+
+		const connectedPort = hostPort!;
+		await fireEvent.click(closeButton()!);
+		await nextTick();
+		expect(connectedPort.close).toHaveBeenCalledOnce();
+		expect(view.queryByTitle('Open Farm Game')).toBeNull();
 	});
 });
