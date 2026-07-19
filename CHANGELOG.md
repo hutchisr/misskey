@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Client
+- Enhance: MRF（メッセージ書き換えポリシー）設定画面のUIを改善
 - Feat: Fediverse Mini Apps V1 をURLプレビューから安全に起動できるように
 - Fix: Fediverse Mini Apps の新規UI文言が英語環境で日本語にフォールバックする問題を修正
 - Note: Fediverse Mini Apps の英語文言は Crowdin 同期までの暫定フォールバックです

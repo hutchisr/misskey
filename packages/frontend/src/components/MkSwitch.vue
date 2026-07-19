@@ -8,11 +8,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<input
 		ref="input"
 		type="checkbox"
+		:checked="isChecked"
+		:aria-label="inputAriaLabel"
 		:disabled="disabled"
 		:class="$style.input"
 		@click="toggle"
 	>
-	<XButton :class="$style.toggle" :checked="checked" :disabled="disabled" @toggle="toggle"/>
+	<XButton :class="$style.toggle" :checked="isChecked" :disabled="disabled" @toggle="toggle"/>
 	<span v-if="!noBody" :class="$style.body">
 		<!-- TODO: 無名slotの方は廃止 -->
 		<span :class="$style.label">
@@ -27,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { toRefs } from 'vue';
+import { computed, toRefs, unref } from 'vue';
 import type { Ref } from 'vue';
 import XButton from '@/components/MkSwitch.button.vue';
 import { haptic } from '@/utility/haptic.js';
@@ -35,6 +37,7 @@ import { haptic } from '@/utility/haptic.js';
 const props = defineProps<{
 	modelValue: boolean | Ref<boolean>;
 	disabled?: boolean;
+	inputAriaLabel?: string;
 	helpText?: string;
 	noBody?: boolean;
 }>();
@@ -45,10 +48,11 @@ const emit = defineEmits<{
 }>();
 
 const checked = toRefs(props).modelValue;
+const isChecked = computed(() => unref(checked.value));
 const toggle = () => {
 	if (props.disabled) return;
-	emit('update:modelValue', !checked.value);
-	emit('change', !checked.value);
+	emit('update:modelValue', !isChecked.value);
+	emit('change', !isChecked.value);
 
 	haptic();
 };

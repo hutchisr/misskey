@@ -6861,6 +6861,120 @@ export interface Locale extends ILocale {
          */
         "global": string;
     };
+    "_mrf": {
+        /**
+         * メッセージ書き換えポリシー
+         */
+        "title": string;
+        /**
+         * 有効なポリシー
+         */
+        "enabledPolicies": string;
+        /**
+         * シンプルポリシー
+         */
+        "simplePolicy": string;
+        /**
+         * 送信元サーバーのホスト名に基づいてアクティビティをフィルタリングします。
+         */
+        "simplePolicyDescription": string;
+        /**
+         * キーワードポリシー
+         */
+        "keywordPolicy": string;
+        /**
+         * コンテンツのキーワードやパターンに基づいてアクティビティを拒否または書き換えます。
+         */
+        "keywordPolicyDescription": string;
+        /**
+         * Hellthreadポリシー
+         */
+        "hellthreadPolicy": string;
+        /**
+         * 宛先が過剰に多いアクティビティをフィルタリングします。
+         */
+        "hellthreadPolicyDescription": string;
+        /**
+         * 拒否するサーバー
+         */
+        "simpleReject": string;
+        /**
+         * これらのサーバーからのすべてのアクティビティを拒否します。1行に1つホスト名を入力します。
+         */
+        "simpleRejectDescription": string;
+        /**
+         * 添付ファイルを削除するサーバー
+         */
+        "simpleMediaRemoval": string;
+        /**
+         * これらのサーバーから送信されたアクティビティの添付ファイルを削除します。1行に1つホスト名を入力します。
+         */
+        "simpleMediaRemovalDescription": string;
+        /**
+         * メディアをセンシティブにするサーバー
+         */
+        "simpleMediaNsfw": string;
+        /**
+         * これらのサーバーから送信されたメディアをセンシティブとして扱います。1行に1つホスト名を入力します。
+         */
+        "simpleMediaNsfwDescription": string;
+        /**
+         * 通報を破棄するサーバー
+         */
+        "simpleReportRemoval": string;
+        /**
+         * これらのサーバーから送信された通報（Flagアクティビティ）を破棄します。1行に1つホスト名を入力します。
+         */
+        "simpleReportRemovalDescription": string;
+        /**
+         * フォロワー限定にするサーバー
+         */
+        "simpleFollowersOnly": string;
+        /**
+         * これらのサーバーから送信されたアクティビティからPublic宛てを削除し、実質的にフォロワー限定にします。1行に1つホスト名を入力します。
+         */
+        "simpleFollowersOnlyDescription": string;
+        /**
+         * 拒否するパターン
+         */
+        "keywordReject": string;
+        /**
+         * これらのキーワードまたはパターンを含むアクティビティを拒否します。1行に1つ入力します。正規表現はスラッシュ（/）で囲みます。
+         */
+        "keywordRejectDescription": string;
+        /**
+         * 置換ルール
+         */
+        "keywordReplace": string;
+        /**
+         * パターンに一致するコンテンツを置換します。正規表現はスラッシュ（/）で囲みます。
+         */
+        "keywordReplaceDescription": string;
+        /**
+         * パターン
+         */
+        "pattern": string;
+        /**
+         * 置換内容
+         */
+        "replacement": string;
+        /**
+         * 拒否する宛先数
+         */
+        "hellthreadRejectThreshold": string;
+        /**
+         * この値より宛先が多いアクティビティを拒否します。0で無効になります。
+         */
+        "hellthreadRejectThresholdDescription": string;
+        /**
+         * 公開範囲を解除する宛先数
+         */
+        "hellthreadDelistThreshold": string;
+        /**
+         * この値より宛先が多いアクティビティからPublic宛てを削除します。0で無効になります。
+         */
+        "hellthreadDelistThresholdDescription": string;
+    };
     "_serverRules": {
         /**
          * 新規登録前に表示する、サーバーの簡潔なルールを設定します。内容は利用規約の要約とすることを推奨します。
