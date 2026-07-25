@@ -11,6 +11,7 @@
 - Fix: 「もっと！」メニューから Fediverse Mini App を再度開くと待機ダイアログが閉じない問題を修正
 - Fix: 「もっと！」メニューで Fediverse Mini App のアイコンとゲームパッドが重なって表示される問題を修正
 - Fix: 1つのノートに同じ Fediverse Mini App へのリンクが複数あると起動ボタンが重複して表示される問題を修正
+- Fix: 動的登録された OAuth クライアントで Fediverse Mini App の認証を開始できない問題を修正
 
 ### Server
 - Feat: Fediverse Mini Apps V1 向けのマニフェスト検証、OAuth、認証APIに対応

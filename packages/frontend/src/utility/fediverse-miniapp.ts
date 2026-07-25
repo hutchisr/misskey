@@ -304,7 +304,7 @@ function validAuthorizationRequest(
 	const isBackend = hasExactFields(message, backendFields);
 	const isBrowser = hasExactFields(message, browserFields) && message.completionMode === 'browser_code';
 	if (!isBackend && !isBrowser) return null;
-	if (typeof message.clientId !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(message.clientId) || message.clientId !== resolved.manifestUrl) return null;
+	if (typeof message.clientId !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(message.clientId)) return null;
 	if (typeof message.redirectUri !== 'string' || !manifest.oauth?.redirectUris.includes(message.redirectUri)) return null;
 	if (!Array.isArray(message.scopes) || message.scopes.length === 0 || message.scopes.length > 16) return null;
 	if (!message.scopes.every(scope => typeof scope === 'string' && manifest.oauth?.scopes.includes(scope))) return null;

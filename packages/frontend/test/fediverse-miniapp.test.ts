@@ -153,6 +153,25 @@ describe('Fediverse Mini App protocol', () => {
 			},
 		});
 
+		const registeredClientId = 'ap3cl139zk';
+		expect(parseFediverseMiniAppPortMessage({
+			...message,
+			clientId: registeredClientId,
+		}, launchId, resolvedResponse)).toEqual({
+			type: 'requestAuth',
+			request: {
+				requestId,
+				completionMode: 'backend_handoff',
+				clientId: registeredClientId,
+				redirectUri: `${appOrigin}/oauth/callback`,
+				scopes: ['identify', 'write'],
+				state: 's'.repeat(43),
+				codeChallenge: 'c'.repeat(43),
+				handoffChallenge: 'h'.repeat(43),
+				authorizationLifetimeSeconds: 31_536_000,
+			},
+		});
+
 		expect(parseFediverseMiniAppPortMessage({
 			...message,
 			redirectUri: 'https://attacker.example/callback',
