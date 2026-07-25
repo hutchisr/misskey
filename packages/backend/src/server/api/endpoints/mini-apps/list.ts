@@ -10,8 +10,9 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 export const meta = {
 	stability: 'experimental',
 	tags: ['app', 'account'],
-	description: 'List Fediverse Mini Apps discovered or registered by the current user.',
+	description: 'List dynamically registered Fediverse Mini Apps authorized by the current user.',
 	requireCredential: true,
+	kind: 'read:account',
 	secure: true,
 	res: {
 		type: 'array',

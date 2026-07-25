@@ -151,15 +151,21 @@ export class OAuthClientRegistrationService {
 
 	public async register(value: unknown): Promise<OAuthClientRegistrationResponse> {
 		const input = object(value);
-		const manifestUri = optionalString(input.fediverse_miniapp_manifest_uri, 'fediverse_miniapp_manifest_uri', 2048);
+		const profileManifestUri = optionalString(input.fediverse_miniapp_manifest_uri, 'fediverse_miniapp_manifest_uri', 2048);
+		const manifestUrl = optionalString(input.manifest_url, 'manifest_url', 2048);
+		if (profileManifestUri != null && manifestUrl != null && profileManifestUri !== manifestUrl) {
+			throw registrationError('invalid_client_metadata', '`fediverse_miniapp_manifest_uri` and `manifest_url` must match');
+		}
+		const manifestUri = profileManifestUri ?? manifestUrl;
+		const manifestParameterName = profileManifestUri == null ? 'manifest_url' : 'fediverse_miniapp_manifest_uri';
 		const resolvedManifest = manifestUri == null
 			? null
 			: await this.miniAppManifestService.resolveManifestUrl(manifestUri).catch(() => {
-				throw registrationError('invalid_client_metadata', 'unable to resolve `fediverse_miniapp_manifest_uri`');
+				throw registrationError('invalid_client_metadata', `unable to resolve \`${manifestParameterName}\``);
 			});
 
 		if (resolvedManifest != null && resolvedManifest.manifestUrl !== manifestUri) {
-			throw registrationError('invalid_client_metadata', '`fediverse_miniapp_manifest_uri` must be canonical');
+			throw registrationError('invalid_client_metadata', `\`${manifestParameterName}\` must be canonical`);
 		}
 
 		const registeredRedirectUris = redirectUris(input.redirect_uris);
