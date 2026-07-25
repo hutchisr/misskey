@@ -11,7 +11,8 @@ import { api, castAsError, initTestDb, origin, relativeFetch, signup } from '../
 import type { DataSource } from 'typeorm';
 import type * as misskey from 'misskey-js';
 import { MiAccessToken } from '@/models/AccessToken.js';
-import { MiUserMiniApp } from '@/models/UserMiniApp.js';
+import { MiMiniAppOAuthRefreshToken } from '@/models/MiniAppOAuthRefreshToken.js';
+import { MiOAuthClient } from '@/models/OAuthClient.js';
 
 describe('Fediverse Mini Apps API', () => {
 	let db: DataSource;
@@ -102,37 +103,116 @@ describe('Fediverse Mini Apps API', () => {
 		beforeAll(async () => {
 			const older = new Date('2026-01-01T00:00:00.000Z');
 			const newer = new Date('2026-01-02T00:00:00.000Z');
-			await db.getRepository(MiUserMiniApp).insert([{
+			const authorizationExpiresAt = new Date(Date.now() + (60 * 60 * 1000));
+			await db.getRepository(MiOAuthClient).insert([{
 				id: '1'.repeat(32),
-				userId: alice.id,
-				manifestUrl: 'https://older-miniapp.example/.well-known/fediverse-miniapp.json',
-				launchUrl: 'https://older-miniapp.example/',
-				name: 'Older Mini App',
-				iconUrl: null,
 				createdAt: older,
-				lastDiscoveredAt: older,
+				kind: 'miniapp',
+				metadata: {
+					redirect_uris: ['https://older-miniapp.example/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code', 'refresh_token'],
+					response_types: ['code'],
+					scope: 'identify write',
+					fediverse_miniapp_manifest_uri: 'https://older-miniapp.example/.well-known/fediverse-miniapp.json',
+					client_uri: 'https://older-miniapp.example/',
+					client_name: 'Older Mini App',
+				},
 			}, {
 				id: '2'.repeat(32),
-				userId: alice.id,
-				manifestUrl: 'https://newer-miniapp.example/.well-known/fediverse-miniapp.json',
-				launchUrl: 'https://newer-miniapp.example/play',
-				name: 'Newer Mini App',
-				iconUrl: 'https://newer-miniapp.example/icon.png',
 				createdAt: newer,
-				lastDiscoveredAt: newer,
+				kind: 'miniapp',
+				metadata: {
+					redirect_uris: ['https://newer-miniapp.example/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code', 'refresh_token'],
+					response_types: ['code'],
+					scope: 'identify write',
+					fediverse_miniapp_manifest_uri: 'https://newer-miniapp.example/.well-known/fediverse-miniapp.json',
+					client_uri: 'https://newer-miniapp.example/play',
+					client_name: 'Newer Mini App',
+					logo_uri: 'https://newer-miniapp.example/icon.png',
+				},
 			}, {
 				id: '3'.repeat(32),
-				userId: bob.id,
-				manifestUrl: 'https://bob-miniapp.example/.well-known/fediverse-miniapp.json',
-				launchUrl: 'https://bob-miniapp.example/',
-				name: 'Bob Mini App',
-				iconUrl: null,
 				createdAt: newer,
-				lastDiscoveredAt: newer,
+				kind: 'miniapp',
+				metadata: {
+					redirect_uris: ['https://bob-miniapp.example/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code', 'refresh_token'],
+					response_types: ['code'],
+					scope: 'identify write',
+					fediverse_miniapp_manifest_uri: 'https://bob-miniapp.example/.well-known/fediverse-miniapp.json',
+					client_uri: 'https://bob-miniapp.example/',
+					client_name: 'Bob Mini App',
+				},
+			}]);
+			await db.getRepository(MiMiniAppOAuthRefreshToken).insert([{
+				id: '4'.repeat(32),
+				tokenHash: '4'.repeat(64),
+				grantId: '7'.repeat(32),
+				userId: alice.id,
+				clientId: '1'.repeat(32),
+				clientName: 'Older Mini App',
+				scope: ['identify', 'write'],
+				authorizationExpiresAt,
+				refreshSequence: 0,
+			}, {
+				id: '5'.repeat(32),
+				tokenHash: '5'.repeat(64),
+				grantId: '8'.repeat(32),
+				userId: alice.id,
+				clientId: '2'.repeat(32),
+				clientName: 'Newer Mini App',
+				scope: ['identify', 'write'],
+				authorizationExpiresAt,
+				refreshSequence: 0,
+			}, {
+				id: '6'.repeat(32),
+				tokenHash: '6'.repeat(64),
+				grantId: '9'.repeat(32),
+				userId: bob.id,
+				clientId: '3'.repeat(32),
+				clientName: 'Bob Mini App',
+				scope: ['identify', 'write'],
+				authorizationExpiresAt,
+				refreshSequence: 0,
+			}]);
+			await db.getRepository(MiAccessToken).insert([{
+				id: '7'.repeat(32),
+				lastUsedAt: older,
+				token: 'd'.repeat(128),
+				hash: 'd'.repeat(128),
+				userId: alice.id,
+				name: 'Older Mini App',
+				permission: ['identify', 'write'],
+				miniAppOAuthGrantId: '7'.repeat(32),
+				expiresAt: authorizationExpiresAt,
+			}, {
+				id: '8'.repeat(32),
+				lastUsedAt: newer,
+				token: 'e'.repeat(128),
+				hash: 'e'.repeat(128),
+				userId: alice.id,
+				name: 'Newer Mini App',
+				permission: ['identify', 'write'],
+				miniAppOAuthGrantId: '8'.repeat(32),
+				expiresAt: authorizationExpiresAt,
+			}, {
+				id: '9'.repeat(32),
+				lastUsedAt: newer,
+				token: 'f'.repeat(128),
+				hash: 'f'.repeat(128),
+				userId: bob.id,
+				name: 'Bob Mini App',
+				permission: ['identify', 'write'],
+				miniAppOAuthGrantId: '9'.repeat(32),
+				expiresAt: authorizationExpiresAt,
 			}]);
 		});
 
-		test('lists only the current user\'s apps, most recently discovered first', async () => {
+		test('lists only the current user\'s authorized clients, most recently used first', async () => {
 			const res = await api('mini-apps/list', { limit: 12 }, alice);
 
 			assert.strictEqual(res.status, 200);

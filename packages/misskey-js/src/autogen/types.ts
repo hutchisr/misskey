@@ -2960,10 +2960,10 @@ export type paths = {
     '/mini-apps/list': {
         /**
          * mini-apps/list
-         * @description List Fediverse Mini Apps discovered or registered by the current user.
+         * @description List dynamically registered Fediverse Mini Apps authorized by the current user.
          *
          *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
-         *     **Credential required**: *Yes*
+         *     **Credential required**: *Yes* / **Permission**: *read:account*
          */
         post: operations['mini-apps___list'];
     };
@@ -2973,7 +2973,7 @@ export type paths = {
          * @description Resolve and validate a Fediverse Mini Apps V1 manifest for a linked application URL.
          *
          *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
-         *     **Credential required**: *Yes*
+         *     **Credential required**: *Yes* / **Permission**: *read:account*
          */
         post: operations['mini-apps___resolve'];
     };

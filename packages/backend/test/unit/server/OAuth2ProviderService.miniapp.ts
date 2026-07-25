@@ -15,7 +15,6 @@ import type { CacheService } from '@/core/CacheService.js';
 import type { LoggerService } from '@/core/LoggerService.js';
 import type { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import type { MiniAppOAuthTokenService, MiniAppOAuthTokenResponse } from '@/core/MiniAppOAuthTokenService.js';
-import type { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import { OAuth2ProviderService } from '@/server/oauth/OAuth2ProviderService.js';
 import { OAuthClientRegistrationService } from '@/server/oauth/OAuthClientRegistrationService.js';
@@ -74,7 +73,6 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 	const issueAuthorization = vi.fn();
 	const refreshAuthorization = vi.fn();
 	const revoke = vi.fn();
-	const recordMiniApp = vi.fn();
 	const limit = vi.fn();
 	const findOAuthClient = vi.fn();
 	const insertOAuthClient = vi.fn();
@@ -107,7 +105,6 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			manifestService,
 			miniAppOAuthTokenService,
 			oauthClientRegistrationService,
-			{ record: recordMiniApp } as unknown as UserMiniAppService,
 			{ limit } as unknown as RateLimiterService,
 			{
 				localUserByNativeTokenCache: {
@@ -171,7 +168,6 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		issueAuthorization.mockReset().mockResolvedValue({ grantId: 'grant1', response: tokenResponse });
 		refreshAuthorization.mockReset().mockResolvedValue(tokenResponse);
 		revoke.mockReset().mockResolvedValue(undefined);
-		recordMiniApp.mockReset().mockResolvedValue(undefined);
 		limit.mockReset().mockResolvedValue(null);
 	});
 
@@ -199,7 +195,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 				grant_types: ['authorization_code', 'refresh_token'],
 				response_types: ['code'],
 				scope: 'identify write',
-				fediverse_miniapp_manifest_uri: manifestUrl,
+				manifest_url: manifestUrl,
 			},
 		});
 		expect(response.statusCode).toBe(201);
@@ -220,6 +216,27 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(response.headers['cache-control']).toBe('no-store');
 		expect(response.headers['content-length']).toBeDefined();
 		expect(response.headers['transfer-encoding']).toBeUndefined();
+	});
+
+	test('rejects conflicting Mini App manifest registration extensions', async () => {
+		const response = await fastify.inject({
+			method: 'POST',
+			url: '/oauth/register',
+			payload: {
+				redirect_uris: [redirectUri],
+				token_endpoint_auth_method: 'none',
+				grant_types: ['authorization_code', 'refresh_token'],
+				response_types: ['code'],
+				scope: 'identify write',
+				manifest_url: manifestUrl,
+				fediverse_miniapp_manifest_uri: 'https://other.example/.well-known/fediverse-miniapp.json',
+			},
+		});
+
+		expect(response.statusCode).toBe(400);
+		expect(response.json()).toMatchObject({ error: 'invalid_client_metadata' });
+		expect(resolveManifestUrl).not.toHaveBeenCalled();
+		expect(insertOAuthClient).not.toHaveBeenCalled();
 	});
 
 	test('registers an ordinary public OAuth client without the Mini App extension', async () => {
@@ -563,13 +580,6 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			clientName: 'Open Farm Game',
 			scope: ['identify', 'write'],
 		}));
-		expect(recordMiniApp).toHaveBeenCalledWith({
-			userId: 'user1',
-			manifestUrl,
-			launchUrl: resolvedManifest.manifest.homeUrl,
-			name: resolvedManifest.manifest.name,
-			iconUrl: resolvedManifest.manifest.iconUrl,
-		});
 	});
 
 	test('rejects a manifest-exceeding lifetime through a callback without iss', async () => {

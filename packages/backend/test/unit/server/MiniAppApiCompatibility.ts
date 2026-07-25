@@ -8,7 +8,6 @@ import type { Config } from '@/config.js';
 import type { NoteCreateService } from '@/core/NoteCreateService.js';
 import type { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
 import type { MiniAppManifestService, ResolvedMiniAppManifest } from '@/core/MiniAppManifestService.js';
-import type { UserMiniAppService } from '@/core/UserMiniAppService.js';
 import type { AccessTokensRepository, AppsRepository, UsersRepository } from '@/models/_.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
 import type { MiLocalUser } from '@/models/User.js';
@@ -34,7 +33,7 @@ const miniAppToken = { id: 'token1', miniAppOAuthGrantId: 'grant1' } as MiAccess
 const ordinaryToken = { id: 'token2', miniAppOAuthGrantId: null } as MiAccessToken;
 
 describe('Fediverse Mini App compatibility API', () => {
-	test('resolving a mini app records its canonical launch metadata for the current user', async () => {
+	test('resolving a mini app returns its canonical launch metadata', async () => {
 		const resolved = {
 			manifestUrl: 'https://farm.example/.well-known/fediverse-miniapp.json',
 			appOrigin: 'https://farm.example',
@@ -47,21 +46,12 @@ describe('Fediverse Mini App compatibility API', () => {
 			},
 		} as unknown as ResolvedMiniAppManifest;
 		const resolveAppUrl = vi.fn(async () => resolved);
-		const recordResolved = vi.fn();
 		const endpoint = new ResolveMiniAppEndpoint(
 			{ resolveAppUrl } as unknown as MiniAppManifestService,
-			{ recordResolved } as unknown as UserMiniAppService,
 		);
 
 		await expect(endpoint.exec({ url: resolved.launchUrl }, user, null)).resolves.toBe(resolved);
-		expect(recordResolved).toHaveBeenCalledWith(user.id, expect.objectContaining({
-			manifestUrl: resolved.manifestUrl,
-			manifest: expect.objectContaining({
-				homeUrl: 'https://farm.example/play',
-				name: 'Open Farm Game',
-				iconUrl: 'https://farm.example/icon.png',
-			}),
-		}));
+		expect(resolveAppUrl).toHaveBeenCalledWith(resolved.launchUrl);
 	});
 
 	test('identity returns a same-origin profile only for mini app credentials', async () => {
