@@ -307,7 +307,7 @@ export class ApiCallService implements OnApplicationShutdown {
 		request: FastifyRequest<{ Body: Record<string, unknown> | undefined, Querystring: Record<string, unknown> }>,
 	) {
 		const isSecure = user != null && token == null;
-		if (token?.miniAppOAuthGrantId != null && ep.meta.allowMiniAppCredential !== true) {
+		if (token?.oauthClientKind === 'miniapp' && ep.meta.allowMiniAppCredential !== true) {
 			throw new ApiError({
 				message: 'This mini app credential cannot use the requested endpoint.',
 				code: 'PERMISSION_DENIED',

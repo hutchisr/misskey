@@ -11,7 +11,7 @@ import { api, castAsError, initTestDb, origin, relativeFetch, signup } from '../
 import type { DataSource } from 'typeorm';
 import type * as misskey from 'misskey-js';
 import { MiAccessToken } from '@/models/AccessToken.js';
-import { MiMiniAppOAuthRefreshToken } from '@/models/MiniAppOAuthRefreshToken.js';
+import { MiOAuthGrant } from '@/models/OAuthGrant.js';
 import { MiOAuthClient } from '@/models/OAuthClient.js';
 
 describe('Fediverse Mini Apps API', () => {
@@ -40,7 +40,8 @@ describe('Fediverse Mini Apps API', () => {
 			userId: alice.id,
 			name: 'Full-scope mini app',
 			permission: ['identify', 'write'],
-			miniAppOAuthGrantId: 'd'.repeat(32),
+			oauthGrantId: 'd'.repeat(32),
+			oauthClientKind: 'miniapp',
 			expiresAt,
 		}, {
 			id: 'b'.repeat(32),
@@ -50,7 +51,8 @@ describe('Fediverse Mini Apps API', () => {
 			userId: alice.id,
 			name: 'Identify-only mini app',
 			permission: ['identify'],
-			miniAppOAuthGrantId: 'e'.repeat(32),
+			oauthGrantId: 'e'.repeat(32),
+			oauthClientKind: 'miniapp',
 			expiresAt,
 		}, {
 			id: 'c'.repeat(32),
@@ -60,7 +62,8 @@ describe('Fediverse Mini Apps API', () => {
 			userId: alice.id,
 			name: 'Write-only mini app',
 			permission: ['write'],
-			miniAppOAuthGrantId: 'f'.repeat(32),
+			oauthGrantId: 'f'.repeat(32),
+			oauthClientKind: 'miniapp',
 			expiresAt,
 		}]);
 	}, 1000 * 60 * 2);
@@ -148,12 +151,13 @@ describe('Fediverse Mini Apps API', () => {
 					client_name: 'Bob Mini App',
 				},
 			}]);
-			await db.getRepository(MiMiniAppOAuthRefreshToken).insert([{
+			await db.getRepository(MiOAuthGrant).insert([{
 				id: '4'.repeat(32),
 				tokenHash: '4'.repeat(64),
 				grantId: '7'.repeat(32),
 				userId: alice.id,
 				clientId: '1'.repeat(32),
+				clientKind: 'miniapp',
 				clientName: 'Older Mini App',
 				scope: ['identify', 'write'],
 				authorizationExpiresAt,
@@ -164,6 +168,7 @@ describe('Fediverse Mini Apps API', () => {
 				grantId: '8'.repeat(32),
 				userId: alice.id,
 				clientId: '2'.repeat(32),
+				clientKind: 'miniapp',
 				clientName: 'Newer Mini App',
 				scope: ['identify', 'write'],
 				authorizationExpiresAt,
@@ -174,6 +179,7 @@ describe('Fediverse Mini Apps API', () => {
 				grantId: '9'.repeat(32),
 				userId: bob.id,
 				clientId: '3'.repeat(32),
+				clientKind: 'miniapp',
 				clientName: 'Bob Mini App',
 				scope: ['identify', 'write'],
 				authorizationExpiresAt,
@@ -187,7 +193,8 @@ describe('Fediverse Mini Apps API', () => {
 				userId: alice.id,
 				name: 'Older Mini App',
 				permission: ['identify', 'write'],
-				miniAppOAuthGrantId: '7'.repeat(32),
+				oauthGrantId: '7'.repeat(32),
+				oauthClientKind: 'miniapp',
 				expiresAt: authorizationExpiresAt,
 			}, {
 				id: '8'.repeat(32),
@@ -197,7 +204,8 @@ describe('Fediverse Mini Apps API', () => {
 				userId: alice.id,
 				name: 'Newer Mini App',
 				permission: ['identify', 'write'],
-				miniAppOAuthGrantId: '8'.repeat(32),
+				oauthGrantId: '8'.repeat(32),
+				oauthClientKind: 'miniapp',
 				expiresAt: authorizationExpiresAt,
 			}, {
 				id: '9'.repeat(32),
@@ -207,7 +215,8 @@ describe('Fediverse Mini Apps API', () => {
 				userId: bob.id,
 				name: 'Bob Mini App',
 				permission: ['identify', 'write'],
-				miniAppOAuthGrantId: '9'.repeat(32),
+				oauthGrantId: '9'.repeat(32),
+				oauthClientKind: 'miniapp',
 				expiresAt: authorizationExpiresAt,
 			}]);
 		});

@@ -7,7 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { In, MoreThan, type DataSource } from 'typeorm';
 import { DI } from '@/di-symbols.js';
 import { MiAccessToken } from '@/models/AccessToken.js';
-import { MiMiniAppOAuthRefreshToken } from '@/models/MiniAppOAuthRefreshToken.js';
+import { MiOAuthGrant } from '@/models/OAuthGrant.js';
 import { MiOAuthClient } from '@/models/OAuthClient.js';
 import type { MiUser } from '@/models/User.js';
 
@@ -30,17 +30,18 @@ export class UserMiniAppService {
 	}
 
 	public async list(userId: MiUser['id'], limit: number): Promise<UserMiniApp[]> {
-		const refreshTokens = await this.db.getRepository(MiMiniAppOAuthRefreshToken).find({
+		const grants = await this.db.getRepository(MiOAuthGrant).find({
 			where: {
 				userId,
+				clientKind: 'miniapp',
 				authorizationExpiresAt: MoreThan(new Date()),
 			},
 		});
-		if (refreshTokens.length === 0) return [];
+		if (grants.length === 0) return [];
 
 		const oauthClients = await this.db.getRepository(MiOAuthClient).find({
 			where: {
-				id: In([...new Set(refreshTokens.map(token => token.clientId))]),
+				id: In([...new Set(grants.map(grant => grant.clientId))]),
 				kind: 'miniapp',
 			},
 		});
@@ -50,24 +51,24 @@ export class UserMiniAppService {
 		const accessTokens = await this.db.getRepository(MiAccessToken).find({
 			where: {
 				userId,
-				miniAppOAuthGrantId: In(refreshTokens.map(token => token.grantId)),
+				oauthGrantId: In(grants.map(grant => grant.grantId)),
 			},
 		});
 		const lastUsedAtByGrantId = new Map(accessTokens.flatMap(token => (
-			token.miniAppOAuthGrantId == null || token.lastUsedAt == null
+			token.oauthGrantId == null || token.lastUsedAt == null
 				? []
-				: [[token.miniAppOAuthGrantId, token.lastUsedAt] as const]
+				: [[token.oauthGrantId, token.lastUsedAt] as const]
 		)));
 		const miniAppByManifestUrl = new Map<string, UserMiniApp>();
 
-		for (const refreshToken of refreshTokens) {
-			const client = clientById.get(refreshToken.clientId);
+		for (const grant of grants) {
+			const client = clientById.get(grant.clientId);
 			const manifestUrl = client?.metadata.fediverse_miniapp_manifest_uri;
 			const launchUrl = client?.metadata.client_uri;
 			const name = client?.metadata.client_name;
 			if (client == null || manifestUrl == null || launchUrl == null || name == null) continue;
 
-			const lastDiscoveredAt = lastUsedAtByGrantId.get(refreshToken.grantId) ?? client.createdAt;
+			const lastDiscoveredAt = lastUsedAtByGrantId.get(grant.grantId) ?? client.createdAt;
 			const existing = miniAppByManifestUrl.get(manifestUrl);
 			if (existing != null && existing.lastDiscoveredAt >= lastDiscoveredAt) continue;
 

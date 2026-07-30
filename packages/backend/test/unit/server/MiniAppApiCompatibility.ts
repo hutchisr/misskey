@@ -6,7 +6,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import type { Config } from '@/config.js';
 import type { NoteCreateService } from '@/core/NoteCreateService.js';
-import type { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
+import type { OAuthTokenService } from '@/core/OAuthTokenService.js';
 import type { MiniAppManifestService, ResolvedMiniAppManifest } from '@/core/MiniAppManifestService.js';
 import type { AccessTokensRepository, AppsRepository, UsersRepository } from '@/models/_.js';
 import type { MiAccessToken } from '@/models/AccessToken.js';
@@ -29,8 +29,8 @@ vi.mock('re2', () => ({ default: RegExp }));
 
 const config = { url: 'https://misskey.example/' } as Config;
 const user = { id: 'user1', username: 'alice', host: null, uri: null } as MiLocalUser;
-const miniAppToken = { id: 'token1', miniAppOAuthGrantId: 'grant1' } as MiAccessToken;
-const ordinaryToken = { id: 'token2', miniAppOAuthGrantId: null } as MiAccessToken;
+const miniAppToken = { id: 'token1', oauthGrantId: 'grant1', oauthClientKind: 'miniapp' } as MiAccessToken;
+const ordinaryToken = { id: 'token2', oauthGrantId: 'grant2', oauthClientKind: 'oauth' } as MiAccessToken;
 
 describe('Fediverse Mini App compatibility API', () => {
 	test('resolving a mini app returns its canonical launch metadata', async () => {
@@ -94,7 +94,7 @@ describe('Fediverse Mini App compatibility API', () => {
 		const revokeGrant = vi.fn();
 		const endpoint = new RevokeTokenEndpoint(
 			{ findOneBy, delete: deleteToken } as unknown as AccessTokensRepository,
-			{ revokeGrant } as unknown as MiniAppOAuthTokenService,
+			{ revokeGrant } as unknown as OAuthTokenService,
 		);
 
 		await endpoint.exec({ tokenId: 'token1' }, user, null);

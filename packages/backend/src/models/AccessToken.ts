@@ -7,6 +7,7 @@ import { Entity, PrimaryColumn, Index, Column, ManyToOne, JoinColumn } from 'typ
 import { id } from './util/id.js';
 import { MiUser } from './User.js';
 import { MiApp } from './App.js';
+import type { MiOAuthClientKind } from './OAuthClient.js';
 
 @Entity('access_token')
 export class MiAccessToken {
@@ -93,7 +94,13 @@ export class MiAccessToken {
 		...id(),
 		nullable: true,
 	})
-	public miniAppOAuthGrantId: string | null;
+	public oauthGrantId: string | null;
+
+	@Column('varchar', {
+		length: 16,
+		nullable: true,
+	})
+	public oauthClientKind: MiOAuthClientKind | null;
 
 	@Column('timestamp with time zone', {
 		nullable: true,

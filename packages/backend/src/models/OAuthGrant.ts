@@ -6,9 +6,10 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { id } from './util/id.js';
 import { MiUser } from './User.js';
+import type { MiOAuthClientKind } from './OAuthClient.js';
 
-@Entity('mini_app_oauth_refresh_token')
-export class MiMiniAppOAuthRefreshToken {
+@Entity('oauth_grant')
+export class MiOAuthGrant {
 	@PrimaryColumn(id())
 	public id: string;
 
@@ -36,6 +37,11 @@ export class MiMiniAppOAuthRefreshToken {
 		length: 512,
 	})
 	public clientId: string;
+
+	@Column('varchar', {
+		length: 16,
+	})
+	public clientKind: MiOAuthClientKind;
 
 	@Column('varchar', {
 		length: 128,

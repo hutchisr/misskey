@@ -14,7 +14,7 @@ import type { MiniAppManifestService, ResolvedMiniAppManifest } from '@/core/Min
 import type { CacheService } from '@/core/CacheService.js';
 import type { LoggerService } from '@/core/LoggerService.js';
 import type { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
-import type { MiniAppOAuthTokenService, MiniAppOAuthTokenResponse } from '@/core/MiniAppOAuthTokenService.js';
+import type { OAuthTokenResponse, OAuthTokenService } from '@/core/OAuthTokenService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import { OAuth2ProviderService } from '@/server/oauth/OAuth2ProviderService.js';
 import { OAuthClientRegistrationService } from '@/server/oauth/OAuthClientRegistrationService.js';
@@ -51,7 +51,7 @@ const resolvedManifest: ResolvedMiniAppManifest = {
 	},
 };
 
-const tokenResponse: MiniAppOAuthTokenResponse = {
+const tokenResponse: OAuthTokenResponse = {
 	access_token: 'a'.repeat(128),
 	refresh_token: 'r'.repeat(128),
 	token_type: 'Bearer',
@@ -90,12 +90,12 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			idService,
 			manifestService,
 		);
-		const miniAppOAuthTokenService = {
+		const oauthTokenService = {
 			issueAuthorization,
 			refreshAuthorization,
 			revoke,
 			revokeGrant: vi.fn(),
-		} as unknown as MiniAppOAuthTokenService;
+		} as unknown as OAuthTokenService;
 		service = new OAuth2ProviderService(
 			{ url: issuer } as Config,
 			{ insert: vi.fn(), delete: vi.fn() } as unknown as AccessTokensRepository,
@@ -103,7 +103,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 			idService,
 			{} as HttpRequestService,
 			manifestService,
-			miniAppOAuthTokenService,
+			oauthTokenService,
 			oauthClientRegistrationService,
 			{ limit } as unknown as RateLimiterService,
 			{
@@ -577,6 +577,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(issueAuthorization).toHaveBeenCalledWith(expect.objectContaining({
 			userId: 'user1',
 			clientId: registeredClientId,
+			clientKind: 'miniapp',
 			clientName: 'Open Farm Game',
 			scope: ['identify', 'write'],
 		}));

@@ -29,7 +29,7 @@ import Logger from '@/logger.js';
 import { StatusError } from '@/misc/status-error.js';
 import { HtmlTemplateService } from '@/server/web/HtmlTemplateService.js';
 import { OAuthPage } from '@/server/web/views/oauth.js';
-import { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
+import { OAuthTokenService } from '@/core/OAuthTokenService.js';
 import { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import { OAuthClientRegistrationService } from './OAuthClientRegistrationService.js';
 import {
@@ -158,7 +158,7 @@ interface AuthorizationCodeGrant {
 	scopes: string[];
 	authorizationExpiresAt?: Date;
 	grantedToken?: string;
-	grantedMiniAppGrantId?: string;
+	grantedOAuthGrantId?: string;
 	revoked?: boolean;
 	used?: boolean;
 }
@@ -511,7 +511,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		private idService: IdService,
 		private httpRequestService: HttpRequestService,
 		private miniAppManifestService: MiniAppManifestService,
-		private miniAppOAuthTokenService: MiniAppOAuthTokenService,
+		private oauthTokenService: OAuthTokenService,
 		private oauthClientRegistrationService: OAuthClientRegistrationService,
 		private rateLimiterService: RateLimiterService,
 		private cacheService: CacheService,
@@ -770,8 +770,8 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 		if (granted.grantedToken) {
 			await this.accessTokensRepository.delete({ token: granted.grantedToken });
 		}
-		if (granted.grantedMiniAppGrantId) {
-			await this.miniAppOAuthTokenService.revokeGrant(granted.grantedMiniAppGrantId);
+		if (granted.grantedOAuthGrantId) {
+			await this.oauthTokenService.revokeGrant(granted.grantedOAuthGrantId);
 		}
 	}
 
@@ -838,7 +838,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 					throw new InvalidRequestError('token is required');
 				}
 
-				await this.miniAppOAuthTokenService.revoke(token);
+				await this.oauthTokenService.revoke(token);
 				reply.code(200).send();
 			} catch (error) {
 				sendOAuthProviderError(reply, normalizeOAuthProviderError(error));
@@ -995,7 +995,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 				}
 				if (grantType === 'refresh_token') {
 					const rateLimit = await this.rateLimiterService.limit({
-						key: 'mini-app-token-refresh',
+						key: 'oauth-token-refresh',
 						duration: 60 * 1000,
 						max: 600,
 					}, getIpHash(request.ip));
@@ -1010,7 +1010,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 						throw new InvalidGrantError('refresh_token and client_id are required');
 					}
 
-					const tokenResponse = await this.miniAppOAuthTokenService.refreshAuthorization(refreshToken, clientId);
+					const tokenResponse = await this.oauthTokenService.refreshAuthorization(refreshToken, clientId);
 					reply.send(tokenResponse);
 					return;
 				}
@@ -1063,18 +1063,19 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 						throw new InvalidGrantError('grant request is invalid');
 					}
 
-					const issued = await this.miniAppOAuthTokenService.issueAuthorization({
+					const issued = await this.oauthTokenService.issueAuthorization({
 						userId: granted.userId,
 						clientId: granted.clientId,
+						clientKind: granted.clientKind,
 						clientName: granted.clientName,
 						scope: granted.scopes,
 						authorizationExpiresAt: granted.authorizationExpiresAt,
 					});
-					granted.grantedMiniAppGrantId = issued.grantId;
+					granted.grantedOAuthGrantId = issued.grantId;
 
 					if (granted.revoked) {
 						this.#logger.info('Canceling the mini app token family as the authorization code was revoked in parallel during the process.');
-						await this.miniAppOAuthTokenService.revokeGrant(issued.grantId);
+						await this.oauthTokenService.revokeGrant(issued.grantId);
 						throw new InvalidGrantError('grant request is invalid');
 					}
 
