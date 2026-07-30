@@ -48,7 +48,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private config: Config,
 	) {
 		super(meta, paramDef, async (_ps, me, token) => {
-			if (token?.miniAppOAuthGrantId == null) {
+			if (token?.oauthGrantId == null || token.oauthClientKind !== 'miniapp') {
 				throw new ApiError(meta.errors.miniAppCredentialRequired);
 			}
 

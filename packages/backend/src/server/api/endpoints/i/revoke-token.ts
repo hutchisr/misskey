@@ -7,7 +7,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import type { AccessTokensRepository } from '@/models/_.js';
 import { DI } from '@/di-symbols.js';
-import { MiniAppOAuthTokenService } from '@/core/MiniAppOAuthTokenService.js';
+import { OAuthTokenService } from '@/core/OAuthTokenService.js';
 
 export const meta = {
 	requireCredential: true,
@@ -40,7 +40,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.accessTokensRepository)
 		private accessTokensRepository: AccessTokensRepository,
 
-		private miniAppOAuthTokenService: MiniAppOAuthTokenService,
+		private oauthTokenService: OAuthTokenService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const accessToken = 'tokenId' in ps
@@ -50,8 +50,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					: null;
 			if (accessToken == null) return;
 
-			if (accessToken.miniAppOAuthGrantId != null) {
-				await this.miniAppOAuthTokenService.revokeGrant(accessToken.miniAppOAuthGrantId);
+			if (accessToken.oauthGrantId != null) {
+				await this.oauthTokenService.revokeGrant(accessToken.oauthGrantId);
 			} else {
 				await this.accessTokensRepository.delete(accessToken.id);
 			}

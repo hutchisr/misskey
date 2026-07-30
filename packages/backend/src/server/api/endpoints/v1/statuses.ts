@@ -78,7 +78,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private noteCreateService: NoteCreateService,
 	) {
 		super(meta, paramDef, async (ps, me, token) => {
-			if (token?.miniAppOAuthGrantId == null) {
+			if (token?.oauthGrantId == null || token.oauthClientKind !== 'miniapp') {
 				throw new ApiError(meta.errors.miniAppCredentialRequired);
 			}
 

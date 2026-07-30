@@ -8,7 +8,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DI } from '@/di-symbols.js';
 import type { MiUser } from '@/models/User.js';
 import { MiAccessToken } from '@/models/AccessToken.js';
-import { MiMiniAppOAuthRefreshToken } from '@/models/MiniAppOAuthRefreshToken.js';
+import { MiOAuthGrant } from '@/models/OAuthGrant.js';
+import type { MiOAuthClientKind } from '@/models/OAuthClient.js';
 import { IdService } from '@/core/IdService.js';
 import { secureRndstr } from '@/misc/secure-rndstr.js';
 import type { DataSource, EntityManager } from 'typeorm';
@@ -17,12 +18,12 @@ import { InvalidGrantError } from '@/server/oauth/errors.js';
 const accessTokenLifetimeSeconds = 60 * 60;
 const minimumAuthorizationLifetimeSeconds = 5 * 60;
 const maximumAuthorizationLifetimeSeconds = 365 * 24 * 60 * 60;
-// Mini app backends reconstruct an absolute deadline from this relative value.
+// OAuth clients reconstruct an absolute deadline from this relative value.
 // Apply a fixed margin to rotated responses so ordinary response latency and
 // whole-second rounding do not appear to extend the original client deadline.
 const authorizationLifetimeSafetySecondsPerRefresh = 2 * 60;
 
-export type MiniAppOAuthTokenResponse = {
+export type OAuthTokenResponse = {
 	access_token: string;
 	token_type: 'Bearer';
 	scope: string;
@@ -31,15 +32,16 @@ export type MiniAppOAuthTokenResponse = {
 	authorization_expires_in: number;
 };
 
-export type IssuedMiniAppOAuthTokenResponse = {
+export type IssuedOAuthTokenResponse = {
 	grantId: string;
-	response: MiniAppOAuthTokenResponse;
+	response: OAuthTokenResponse;
 };
 
 type TokenSetParams = {
 	grantId: string;
 	userId: MiUser['id'];
 	clientId: string;
+	clientKind: MiOAuthClientKind;
 	clientName: string;
 	scope: string[];
 	authorizationExpiresAt: Date;
@@ -48,7 +50,7 @@ type TokenSetParams = {
 };
 
 @Injectable()
-export class MiniAppOAuthTokenService {
+export class OAuthTokenService {
 	constructor(
 		@Inject(DI.db)
 		private db: DataSource,
@@ -60,10 +62,11 @@ export class MiniAppOAuthTokenService {
 	public async issueAuthorization(params: {
 		userId: MiUser['id'];
 		clientId: string;
+		clientKind: MiOAuthClientKind;
 		clientName: string;
 		scope: string[];
 		authorizationExpiresAt: Date;
-	}): Promise<IssuedMiniAppOAuthTokenResponse> {
+	}): Promise<IssuedOAuthTokenResponse> {
 		const now = new Date();
 		const authorizationLifetimeMilliseconds = params.authorizationExpiresAt.getTime() - now.getTime();
 		if (!Number.isFinite(params.authorizationExpiresAt.getTime()) ||
@@ -77,6 +80,7 @@ export class MiniAppOAuthTokenService {
 			grantId,
 			userId: params.userId,
 			clientId: params.clientId,
+			clientKind: params.clientKind,
 			clientName: params.clientName,
 			scope: [...params.scope],
 			authorizationExpiresAt: params.authorizationExpiresAt,
@@ -87,16 +91,16 @@ export class MiniAppOAuthTokenService {
 		return { grantId, response };
 	}
 
-	public async refreshAuthorization(refreshToken: string, clientId: string): Promise<MiniAppOAuthTokenResponse> {
+	public async refreshAuthorization(refreshToken: string, clientId: string): Promise<OAuthTokenResponse> {
 		const refreshTokenId = this.refreshTokenIdFromRefreshToken(refreshToken);
 		if (refreshTokenId == null) throw new InvalidGrantError();
 
 		const tokenHash = this.hashToken(refreshToken);
 		const result = await this.db.transaction(async manager => {
-			const refreshTokensRepository = manager.getRepository(MiMiniAppOAuthRefreshToken);
-			const current = await refreshTokensRepository.createQueryBuilder('token')
+			const grantsRepository = manager.getRepository(MiOAuthGrant);
+			const current = await grantsRepository.createQueryBuilder('grant')
 				.setLock('pessimistic_write')
-				.where('token.id = :refreshTokenId', { refreshTokenId })
+				.where('grant.id = :refreshTokenId', { refreshTokenId })
 				.getOne();
 
 			if (current == null || current.clientId !== clientId) {
@@ -114,12 +118,13 @@ export class MiniAppOAuthTokenService {
 			}
 
 			const now = new Date();
-			await manager.delete(MiAccessToken, { miniAppOAuthGrantId: current.grantId });
+			await manager.delete(MiAccessToken, { oauthGrantId: current.grantId });
 
 			return await this.createTokenSet(manager, {
 				grantId: current.grantId,
 				userId: current.userId,
 				clientId: current.clientId,
+				clientKind: current.clientKind,
 				clientName: current.clientName,
 				scope: [...current.scope],
 				authorizationExpiresAt: current.authorizationExpiresAt,
@@ -141,15 +146,15 @@ export class MiniAppOAuthTokenService {
 			const refreshTokenId = this.refreshTokenIdFromRefreshToken(token);
 			const refreshToken = refreshTokenId == null
 				? null
-				: await manager.getRepository(MiMiniAppOAuthRefreshToken).findOneBy({ id: refreshTokenId });
+				: await manager.getRepository(MiOAuthGrant).findOneBy({ id: refreshTokenId });
 			if (refreshToken != null && this.hashesMatch(refreshToken.tokenHash, tokenHash)) {
 				await this.deleteGrant(manager, refreshToken.grantId);
 				return;
 			}
 
 			const accessToken = await manager.getRepository(MiAccessToken).findOneBy({ token });
-			if (accessToken?.miniAppOAuthGrantId != null) {
-				await this.deleteGrant(manager, accessToken.miniAppOAuthGrantId);
+			if (accessToken?.oauthGrantId != null) {
+				await this.deleteGrant(manager, accessToken.oauthGrantId);
 			} else if (accessToken != null) {
 				await manager.delete(MiAccessToken, accessToken.id);
 			}
@@ -160,7 +165,7 @@ export class MiniAppOAuthTokenService {
 		await this.db.transaction(async manager => await this.deleteGrant(manager, grantId));
 	}
 
-	private async createTokenSet(manager: EntityManager, params: TokenSetParams, refreshTokenId?: string): Promise<MiniAppOAuthTokenResponse> {
+	private async createTokenSet(manager: EntityManager, params: TokenSetParams, refreshTokenId?: string): Promise<OAuthTokenResponse> {
 		const authorizationExpiresIn = Math.floor((params.authorizationExpiresAt.getTime() - params.now.getTime()) / 1000) -
 			(params.refreshSequence === 0 ? 0 : authorizationLifetimeSafetySecondsPerRefresh);
 		if (authorizationExpiresIn < minimumAuthorizationLifetimeSeconds) {
@@ -182,7 +187,8 @@ export class MiniAppOAuthTokenService {
 			hash: accessToken,
 			name: params.clientName,
 			permission: [...params.scope],
-			miniAppOAuthGrantId: params.grantId,
+			oauthGrantId: params.grantId,
+			oauthClientKind: params.clientKind,
 			expiresAt: new Date(params.now.getTime() + expiresIn * 1000),
 		});
 
@@ -191,20 +197,21 @@ export class MiniAppOAuthTokenService {
 			grantId: params.grantId,
 			userId: params.userId,
 			clientId: params.clientId,
+			clientKind: params.clientKind,
 			clientName: params.clientName,
 			scope: [...params.scope],
 			authorizationExpiresAt: params.authorizationExpiresAt,
 			refreshSequence: params.refreshSequence,
 		};
 		if (refreshTokenId == null) {
-			await manager.insert(MiMiniAppOAuthRefreshToken, {
+			await manager.insert(MiOAuthGrant, {
 				// This ID is also the refresh-token lookup prefix. It must be
 				// unguessable so a forged prefix cannot revoke another grant.
 				id: currentRefreshTokenId,
 				...refreshTokenState,
 			});
 		} else {
-			await manager.update(MiMiniAppOAuthRefreshToken, refreshTokenId, refreshTokenState);
+			await manager.update(MiOAuthGrant, refreshTokenId, refreshTokenState);
 		}
 
 		return {
@@ -218,8 +225,8 @@ export class MiniAppOAuthTokenService {
 	}
 
 	private async deleteGrant(manager: EntityManager, grantId: string): Promise<void> {
-		await manager.delete(MiAccessToken, { miniAppOAuthGrantId: grantId });
-		await manager.delete(MiMiniAppOAuthRefreshToken, { grantId });
+		await manager.delete(MiAccessToken, { oauthGrantId: grantId });
+		await manager.delete(MiOAuthGrant, { grantId });
 	}
 
 	private hashToken(token: string): string {
