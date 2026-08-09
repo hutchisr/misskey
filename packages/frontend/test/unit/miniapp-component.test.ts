@@ -6,7 +6,6 @@
 import { defineComponent, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
-import './init';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 import MkMiniApp from '@/components/MkMiniApp.vue';
@@ -97,10 +96,12 @@ describe('MkWindow close lifecycle', () => {
 			components: { MkWindow },
 			setup() {
 				const windowEl = ref<InstanceType<typeof MkWindow> | null>(null);
+
 				function onClose(): void {
 					closeEvents();
 					windowEl.value?.close();
 				}
+
 				return { onClose, windowEl };
 			},
 			template: '<MkWindow ref="windowEl" @close="onClose"><span>Window content</span></MkWindow>',

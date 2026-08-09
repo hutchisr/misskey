@@ -4,7 +4,6 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import './init';
 import { formatOAuthAuthorizationDuration } from '@/utility/oauth-authorization-duration.js';
 
 describe('formatOAuthAuthorizationDuration', () => {

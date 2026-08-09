@@ -23,6 +23,7 @@ const intersectionObservers: Array<{ callback: IntersectionObserverCallback; obs
 class TestIntersectionObserver implements IntersectionObserver {
 	public readonly root = null;
 	public readonly rootMargin = '0px';
+	public readonly scrollMargin = '0px';
 	public readonly thresholds = [0];
 
 	constructor(callback: IntersectionObserverCallback) {

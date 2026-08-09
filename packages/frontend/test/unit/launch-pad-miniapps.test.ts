@@ -5,7 +5,7 @@
 
 import { afterEach, assert, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
-import { preferState } from './init.js';
+import { preferState } from '../setup.unit.js';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
 

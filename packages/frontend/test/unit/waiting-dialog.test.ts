@@ -25,7 +25,7 @@ describe('MkWaitingDialog', () => {
 
 		await waitFor(() => {
 			expect(view.emitted('done')).toHaveLength(1);
-			expect((view.container.querySelector('[data-cy-bg]')?.parentElement as HTMLElement | undefined)?.style.display).toBe('none');
+			expect((view.container.querySelector('[data-testid="bg"]')?.parentElement as HTMLElement | undefined)?.style.display).toBe('none');
 		});
 	});
 });

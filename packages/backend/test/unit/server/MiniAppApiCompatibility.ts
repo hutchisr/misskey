@@ -19,6 +19,7 @@ import RevokeTokenEndpoint from '@/server/api/endpoints/i/revoke-token.js';
 import ResolveMiniAppEndpoint from '@/server/api/endpoints/mini-apps/resolve.js';
 import { meta as notesShowMeta, paramDef as notesShowParamDef } from '@/server/api/endpoints/notes/show.js';
 import type { CacheService } from '@/core/CacheService.js';
+import type { TelemetryService } from '@/core/telemetry/TelemetryService.js';
 import type { RateLimiterService } from '@/server/api/RateLimiterService.js';
 import type { RoleService } from '@/core/RoleService.js';
 import type { ApiLoggerService } from '@/server/api/ApiLoggerService.js';
@@ -147,6 +148,9 @@ describe('Fediverse Mini App compatibility API', () => {
 			{} as RateLimiterService,
 			{} as RoleService,
 			{ logger: { error: vi.fn(), warn: vi.fn() } } as unknown as ApiLoggerService,
+			{
+				startSpan: vi.fn((_name: string, fn: () => unknown) => fn()),
+			} as unknown as TelemetryService,
 		);
 		const request = {
 			method: 'POST',
