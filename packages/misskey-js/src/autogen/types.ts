@@ -4008,6 +4008,15 @@ export type paths = {
          */
         post: operations['users___update-memo'];
     };
+    '/v1/accounts/verify_credentials': {
+        /**
+         * v1/accounts/verify_credentials
+         * @description Returns the narrow OAuth identity projection for a Fediverse Mini App credential.
+         *
+         *     **Credential required**: *Yes* / **Permission**: *identify*
+         */
+        post: operations['v1___accounts___verify_credentials'];
+    };
     '/v1/mini-apps/identity': {
         /**
          * v1/mini-apps/identity
@@ -37402,6 +37411,67 @@ export interface operations {
             204: {
                 headers: {
                     [name: string]: unknown;
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    v1___accounts___verify_credentials: {
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        sub: string;
+                        acct: string;
+                    };
                 };
             };
             /** @description Client error */

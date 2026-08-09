@@ -4888,6 +4888,17 @@ declare module '../api.js' {
     ): Promise<SwitchCaseResponseType<E, P>>;
 
     /**
+     * Returns the narrow OAuth identity projection for a Fediverse Mini App credential.
+     *
+     * **Credential required**: *Yes* / **Permission**: *identify*
+     */
+    request<E extends 'v1/accounts/verify_credentials', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
      * No description provided.
      *
      * **Credential required**: *Yes* / **Permission**: *identify*

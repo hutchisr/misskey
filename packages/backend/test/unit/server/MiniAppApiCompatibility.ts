@@ -13,6 +13,7 @@ import type { MiAccessToken } from '@/models/AccessToken.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { AuthenticateService } from '@/server/api/AuthenticateService.js';
 import { ApiCallService } from '@/server/api/ApiCallService.js';
+import VerifyCredentialsEndpoint from '@/server/api/endpoints/v1/accounts/verify_credentials.js';
 import IdentityEndpoint from '@/server/api/endpoints/v1/mini-apps/identity.js';
 import StatusesEndpoint from '@/server/api/endpoints/v1/statuses.js';
 import RevokeTokenEndpoint from '@/server/api/endpoints/i/revoke-token.js';
@@ -28,7 +29,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 vi.mock('re2', () => ({ default: RegExp }));
 
-const config = { url: 'https://misskey.example/' } as Config;
+const config = { url: 'https://misskey.example/', host: 'misskey.example' } as Config;
 const user = { id: 'user1', username: 'alice', host: null, uri: null } as MiLocalUser;
 const miniAppToken = { id: 'token1', oauthGrantId: 'grant1', oauthClientKind: 'miniapp' } as MiAccessToken;
 const ordinaryToken = { id: 'token2', oauthGrantId: 'grant2', oauthClientKind: 'oauth' } as MiAccessToken;
@@ -68,6 +69,18 @@ describe('Fediverse Mini App compatibility API', () => {
 			id: 'https://misskey.example/users/user1',
 			username: 'alice',
 			url: 'https://misskey.example/@alice',
+		});
+	});
+
+	test('verify_credentials returns the narrow standard identity projection', async () => {
+		const endpoint = new VerifyCredentialsEndpoint(config);
+
+		await expect(endpoint.exec({}, user, ordinaryToken)).rejects.toMatchObject({
+			code: 'MINI_APP_CREDENTIAL_REQUIRED',
+		});
+		await expect(endpoint.exec({}, user, miniAppToken)).resolves.toEqual({
+			sub: 'https://misskey.example/users/user1',
+			acct: 'alice@misskey.example',
 		});
 	});
 

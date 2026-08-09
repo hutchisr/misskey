@@ -668,6 +668,7 @@ import type {
 	UsersShowRequest,
 	UsersShowResponse,
 	UsersUpdateMemoRequest,
+	V1AccountsVerifyCredentialsResponse,
 	V1MiniAppsIdentityResponse,
 	V1MiniAppsSessionRestoresConsumeRequest,
 	V1MiniAppsSessionRestoresConsumeResponse,
@@ -1118,6 +1119,7 @@ export type Endpoints = {
 	'users/search-by-username-and-host': { req: UsersSearchByUsernameAndHostRequest; res: UsersSearchByUsernameAndHostResponse };
 	'users/show': { req: UsersShowRequest; res: UsersShowResponse };
 	'users/update-memo': { req: UsersUpdateMemoRequest; res: EmptyResponse };
+	'v1/accounts/verify_credentials': { req: EmptyRequest; res: V1AccountsVerifyCredentialsResponse };
 	'v1/mini-apps/identity': { req: EmptyRequest; res: V1MiniAppsIdentityResponse };
 	'v1/mini-apps/session-restores/consume': { req: V1MiniAppsSessionRestoresConsumeRequest; res: V1MiniAppsSessionRestoresConsumeResponse };
 	'v1/statuses': { req: V1StatusesRequest; res: V1StatusesResponse };
