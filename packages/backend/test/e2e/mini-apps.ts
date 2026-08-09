@@ -316,6 +316,41 @@ describe('Fediverse Mini Apps API', () => {
 		});
 	});
 
+	describe('v1/accounts/verify_credentials', () => {
+		test('supports GET with a mini app Bearer credential', async () => {
+			const res = await relativeFetch('api/v1/accounts/verify_credentials', {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${fullToken}`,
+				},
+			});
+			const body = await res.json() as {
+				sub: string;
+				acct: string;
+			};
+
+			assert.strictEqual(res.status, 200);
+			assert.deepStrictEqual(body, {
+				sub: new URL(`/users/${alice.id}`, origin).toString(),
+				acct: `${alice.username}@${new URL(origin).host}`,
+			});
+		});
+
+		test('rejects an ordinary user credential', async () => {
+			const res = await api('v1/accounts/verify_credentials', {}, alice);
+
+			assert.strictEqual(res.status, 403);
+			assert.strictEqual(castAsError(res.body).error.code, 'MINI_APP_CREDENTIAL_REQUIRED');
+		});
+
+		test('enforces the identify scope', async () => {
+			const res = await api('v1/accounts/verify_credentials', {}, writeCredential);
+
+			assert.strictEqual(res.status, 403);
+			assert.strictEqual(castAsError(res.body).error.code, 'PERMISSION_DENIED');
+		});
+	});
+
 	describe('Mini App session restore', () => {
 		const restoreClientId = 'a'.repeat(32);
 		const restoreGrantId = 'c'.repeat(32);

@@ -424,6 +424,7 @@ export * as 'users/search' from './endpoints/users/search.js';
 export * as 'users/search-by-username-and-host' from './endpoints/users/search-by-username-and-host.js';
 export * as 'users/show' from './endpoints/users/show.js';
 export * as 'users/update-memo' from './endpoints/users/update-memo.js';
+export * as 'v1/accounts/verify_credentials' from './endpoints/v1/accounts/verify_credentials.js';
 export * as 'v1/mini-apps/identity' from './endpoints/v1/mini-apps/identity.js';
 export * as 'v1/mini-apps/session-restores/consume' from './endpoints/v1/mini-apps/session-restores/consume.js';
 export * as 'v1/statuses' from './endpoints/v1/statuses.js';

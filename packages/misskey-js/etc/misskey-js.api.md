@@ -2202,6 +2202,7 @@ declare namespace entities {
         UsersShowRequest,
         UsersShowResponse,
         UsersUpdateMemoRequest,
+        V1AccountsVerifyCredentialsResponse,
         V1MiniAppsIdentityResponse,
         V1MiniAppsSessionRestoresConsumeRequest,
         V1MiniAppsSessionRestoresConsumeResponse,
@@ -3790,6 +3791,9 @@ type UsersUpdateMemoRequest = operations['users___update-memo']['requestBody']['
 
 // @public (undocumented)
 type UserWebhook = components['schemas']['UserWebhook'];
+
+// @public (undocumented)
+type V1AccountsVerifyCredentialsResponse = operations['v1___accounts___verify_credentials']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type V1MiniAppsIdentityResponse = operations['v1___mini-apps___identity']['responses']['200']['content']['application/json'];

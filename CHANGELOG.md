@@ -18,6 +18,7 @@
 - Enhance: OAuth 2.0 Dynamic Client Registration (RFC 7591) に対応し、Mini App マニフェストを任意の拡張メタデータとして登録できるように
 - Enhance: 動的登録された Fediverse Mini Apps の情報を OAuth クライアントと認可情報から取得するように
 - Enhance: Fediverse Mini Apps 向けの検証コード方式セッション復元APIに対応
+- Fix: Fediverse Mini Apps の OAuth 認証後に標準のアカウント確認APIを利用できない問題を修正
 
 ## 2026.7.0
 

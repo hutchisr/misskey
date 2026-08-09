@@ -671,6 +671,7 @@ export type UsersSearchByUsernameAndHostResponse = operations['users___search-by
 export type UsersShowRequest = operations['users___show']['requestBody']['content']['application/json'];
 export type UsersShowResponse = operations['users___show']['responses']['200']['content']['application/json'];
 export type UsersUpdateMemoRequest = operations['users___update-memo']['requestBody']['content']['application/json'];
+export type V1AccountsVerifyCredentialsResponse = operations['v1___accounts___verify_credentials']['responses']['200']['content']['application/json'];
 export type V1MiniAppsIdentityResponse = operations['v1___mini-apps___identity']['responses']['200']['content']['application/json'];
 export type V1MiniAppsSessionRestoresConsumeRequest = operations['v1___mini-apps___session-restores___consume']['requestBody']['content']['application/json'];
 export type V1MiniAppsSessionRestoresConsumeResponse = operations['v1___mini-apps___session-restores___consume']['responses']['200']['content']['application/json'];
