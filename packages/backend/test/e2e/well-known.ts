@@ -101,5 +101,6 @@ describe('.well-known', () => {
 		assert.strictEqual(serverInfo.issuer, origin);
 		assert.strictEqual(serverInfo.authorization_endpoint, `${origin}/oauth/authorize`);
 		assert.strictEqual(serverInfo.token_endpoint, `${origin}/oauth/token`);
+		assert.strictEqual(serverInfo.fediverse_miniapp_session_restore_endpoint, `${origin}/api/v1/mini-apps/session-restores/consume`);
 	});
 });

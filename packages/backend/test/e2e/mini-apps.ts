@@ -6,6 +6,7 @@
 process.env.NODE_ENV = 'test';
 
 import * as assert from 'node:assert';
+import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, test } from 'vitest';
 import { api, castAsError, initTestDb, origin, relativeFetch, signup } from '../utils.js';
 import type { DataSource } from 'typeorm';
@@ -13,6 +14,32 @@ import type * as misskey from 'misskey-js';
 import { MiAccessToken } from '@/models/AccessToken.js';
 import { MiOAuthGrant } from '@/models/OAuthGrant.js';
 import { MiOAuthClient } from '@/models/OAuthClient.js';
+
+function createRestoreProof(): { verifier: string; challenge: string } {
+	const verifier = randomBytes(32).toString('base64url');
+	return {
+		verifier,
+		challenge: createHash('sha256').update(verifier).digest('base64url'),
+	};
+}
+
+async function postJson(
+	path: string,
+	payload: Record<string, unknown>,
+	credential?: { token: string },
+	headers: Record<string, string> = {},
+) {
+	const response = await relativeFetch(path, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			...headers,
+		},
+		body: JSON.stringify(credential == null ? payload : { ...payload, i: credential.token }),
+	});
+	const body = await response.json() as Record<string, unknown>;
+	return { response, body };
+}
 
 describe('Fediverse Mini Apps API', () => {
 	let db: DataSource;
@@ -286,6 +313,151 @@ describe('Fediverse Mini Apps API', () => {
 
 			assert.strictEqual(res.status, 403);
 			assert.strictEqual(castAsError(res.body).error.code, 'PERMISSION_DENIED');
+		});
+	});
+
+	describe('Mini App session restore', () => {
+		const restoreClientId = 'a'.repeat(32);
+		const restoreGrantId = 'c'.repeat(32);
+		const restoreManifestUrl = 'https://restore-miniapp.example/.well-known/fediverse-miniapp.json';
+
+		beforeAll(async () => {
+			await db.getRepository(MiOAuthClient).insert({
+				id: restoreClientId,
+				createdAt: new Date(),
+				kind: 'miniapp',
+				metadata: {
+					redirect_uris: ['https://restore-miniapp.example/oauth/callback'],
+					token_endpoint_auth_method: 'none',
+					grant_types: ['authorization_code', 'refresh_token'],
+					response_types: ['code'],
+					scope: 'identify write',
+					fediverse_miniapp_manifest_uri: restoreManifestUrl,
+					client_uri: 'https://restore-miniapp.example/',
+					client_name: 'Restore Mini App',
+				},
+			});
+			await db.getRepository(MiOAuthGrant).insert({
+				id: 'b'.repeat(32),
+				tokenHash: 'a'.repeat(64),
+				grantId: restoreGrantId,
+				userId: alice.id,
+				clientId: restoreClientId,
+				clientKind: 'miniapp',
+				clientName: 'Restore Mini App',
+				scope: ['identify', 'write'],
+				authorizationExpiresAt: new Date(Date.now() + (60 * 60 * 1000)),
+				refreshSequence: 0,
+			});
+		});
+
+		test('creates and consumes a one-time S256-bound identity proof', async () => {
+			const proof = createRestoreProof();
+			const created = await postJson('api/mini-apps/session-restores/create', {
+				clientId: restoreClientId,
+				manifestUrl: restoreManifestUrl,
+				restoreChallenge: proof.challenge,
+			}, alice);
+
+			assert.strictEqual(created.response.status, 200);
+			assert.strictEqual(created.body.status, 'success');
+			assert.match(created.body.restoreCode as string, /^[A-Za-z0-9_-]{43}$/);
+
+			const consumed = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: proof.verifier,
+			});
+			assert.strictEqual(consumed.response.status, 200);
+			assert.deepStrictEqual(consumed.body, {
+				issuer: origin,
+				sub: new URL(`/users/${alice.id}`, origin).toString(),
+				acct: `${alice.username}@${new URL(origin).host}`,
+			});
+
+			const replayed = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: proof.verifier,
+			});
+			assert.strictEqual(replayed.response.status, 400);
+			assert.strictEqual(castAsError(replayed.body).error.code, 'INVALID_MINI_APP_SESSION_RESTORE');
+		});
+
+		test('burns a proof when verifier validation fails', async () => {
+			const proof = createRestoreProof();
+			const created = await postJson('api/mini-apps/session-restores/create', {
+				clientId: restoreClientId,
+				manifestUrl: restoreManifestUrl,
+				restoreChallenge: proof.challenge,
+			}, alice);
+
+			const wrongVerifier = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: 'wrong',
+			});
+			assert.strictEqual(wrongVerifier.response.status, 400);
+			assert.strictEqual(castAsError(wrongVerifier.body).error.code, 'INVALID_MINI_APP_SESSION_RESTORE');
+
+			const correctVerifier = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: proof.verifier,
+			});
+			assert.strictEqual(correctVerifier.response.status, 400);
+			assert.strictEqual(castAsError(correctVerifier.body).error.code, 'INVALID_MINI_APP_SESSION_RESTORE');
+		});
+
+		test('rejects browser-origin consumption without burning the backend proof', async () => {
+			const proof = createRestoreProof();
+			const created = await postJson('api/mini-apps/session-restores/create', {
+				clientId: restoreClientId,
+				manifestUrl: restoreManifestUrl,
+				restoreChallenge: proof.challenge,
+			}, alice);
+
+			const browserAttempt = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: proof.verifier,
+			}, undefined, {
+				Origin: 'https://restore-miniapp.example',
+			});
+			assert.strictEqual(browserAttempt.response.status, 400);
+			assert.strictEqual(castAsError(browserAttempt.body).error.code, 'INVALID_MINI_APP_SESSION_RESTORE');
+
+			const backendAttempt = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: created.body.restoreCode,
+				restoreVerifier: proof.verifier,
+			});
+			assert.strictEqual(backendAttempt.response.status, 200);
+		});
+
+		test('returns the fixed interaction-required shape for a client/manifest mismatch', async () => {
+			const proof = createRestoreProof();
+			const created = await postJson('api/mini-apps/session-restores/create', {
+				clientId: restoreClientId,
+				manifestUrl: 'https://other.example/.well-known/fediverse-miniapp.json',
+				restoreChallenge: proof.challenge,
+			}, alice);
+
+			assert.strictEqual(created.response.status, 200);
+			assert.deepStrictEqual(created.body, {
+				status: 'interaction_required',
+				restoreCode: null,
+			});
+		});
+
+		test('validates both endpoint request schemas', async () => {
+			const invalidCreate = await postJson('api/mini-apps/session-restores/create', {
+				clientId: restoreClientId,
+				manifestUrl: restoreManifestUrl,
+				restoreChallenge: 'not-s256',
+			}, alice);
+			assert.strictEqual(invalidCreate.response.status, 400);
+			assert.strictEqual(castAsError(invalidCreate.body).error.code, 'INVALID_PARAM');
+
+			const invalidConsume = await postJson('api/v1/mini-apps/session-restores/consume', {
+				restoreCode: 'a'.repeat(43),
+			});
+			assert.strictEqual(invalidConsume.response.status, 400);
+			assert.strictEqual(castAsError(invalidConsume.body).error.code, 'INVALID_PARAM');
 		});
 	});
 

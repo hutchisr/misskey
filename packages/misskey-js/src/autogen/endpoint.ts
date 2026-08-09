@@ -491,6 +491,8 @@ import type {
 	MiniAppsListResponse,
 	MiniAppsResolveRequest,
 	MiniAppsResolveResponse,
+	MiniAppsSessionRestoresCreateRequest,
+	MiniAppsSessionRestoresCreateResponse,
 	MuteCreateRequest,
 	MuteDeleteRequest,
 	MuteListRequest,
@@ -667,6 +669,8 @@ import type {
 	UsersShowResponse,
 	UsersUpdateMemoRequest,
 	V1MiniAppsIdentityResponse,
+	V1MiniAppsSessionRestoresConsumeRequest,
+	V1MiniAppsSessionRestoresConsumeResponse,
 	V1StatusesRequest,
 	V1StatusesResponse,
 	V2AdminEmojiListRequest,
@@ -1000,6 +1004,7 @@ export type Endpoints = {
 	'miauth/gen-token': { req: MiauthGenTokenRequest; res: MiauthGenTokenResponse };
 	'mini-apps/list': { req: MiniAppsListRequest; res: MiniAppsListResponse };
 	'mini-apps/resolve': { req: MiniAppsResolveRequest; res: MiniAppsResolveResponse };
+	'mini-apps/session-restores/create': { req: MiniAppsSessionRestoresCreateRequest; res: MiniAppsSessionRestoresCreateResponse };
 	'mute/create': { req: MuteCreateRequest; res: EmptyResponse };
 	'mute/delete': { req: MuteDeleteRequest; res: EmptyResponse };
 	'mute/list': { req: MuteListRequest; res: MuteListResponse };
@@ -1114,6 +1119,7 @@ export type Endpoints = {
 	'users/show': { req: UsersShowRequest; res: UsersShowResponse };
 	'users/update-memo': { req: UsersUpdateMemoRequest; res: EmptyResponse };
 	'v1/mini-apps/identity': { req: EmptyRequest; res: V1MiniAppsIdentityResponse };
+	'v1/mini-apps/session-restores/consume': { req: V1MiniAppsSessionRestoresConsumeRequest; res: V1MiniAppsSessionRestoresConsumeResponse };
 	'v1/statuses': { req: V1StatusesRequest; res: V1StatusesResponse };
 	'v2/admin/emoji/list': { req: V2AdminEmojiListRequest; res: V2AdminEmojiListResponse };
 	'verify-email': { req: VerifyEmailRequest; res: EmptyResponse };

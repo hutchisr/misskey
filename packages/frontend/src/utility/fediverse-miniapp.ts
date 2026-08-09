@@ -12,6 +12,8 @@ const requestIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 const statePattern = /^[A-Za-z0-9_-]{43,256}$/;
 const codeChallengePattern = /^[A-Za-z0-9_-]{43,128}$/;
 const handoffChallengePattern = /^[A-Za-z0-9_-]{43}$/;
+const restoreChallengePattern = /^[A-Za-z0-9_-]{43}$/;
+const restoreCodePattern = /^[A-Za-z0-9_-]{16,512}$/;
 const scopePattern = /^[A-Za-z][A-Za-z0-9:._-]{0,63}$/;
 
 export type FediverseMiniAppCapability = string;
@@ -74,11 +76,36 @@ export type FediverseMiniAppAuthorizationRequest = {
 	handoffChallenge?: string;
 };
 
+export type FediverseMiniAppSessionRestoreRequest = {
+	requestId: string;
+	clientId: string;
+	restoreChallenge: string;
+};
+
+export type FediverseMiniAppSessionRestoreResult =
+	| {
+		type: 'sessionRestoreResult';
+		version: typeof FEDIVERSE_MINI_APP_PROTOCOL_VERSION;
+		launchId: string;
+		requestId: string;
+		status: 'success';
+		restoreCode: string;
+	}
+	| {
+		type: 'sessionRestoreResult';
+		version: typeof FEDIVERSE_MINI_APP_PROTOCOL_VERSION;
+		launchId: string;
+		requestId: string;
+		status: 'interaction_required';
+	};
+
 export type FediverseMiniAppPortMessage =
 	| { type: 'ready' }
 	| { type: 'close'; requestId: string }
 	| { type: 'requestAuth'; request: FediverseMiniAppAuthorizationRequest }
 	| { type: 'invalidRequestAuth'; requestId: string }
+	| { type: 'restoreSession'; request: FediverseMiniAppSessionRestoreRequest }
+	| { type: 'invalidRestoreSession'; requestId: string }
 	| { type: 'unknown' };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -330,6 +357,25 @@ function validAuthorizationRequest(
 	};
 }
 
+function validSessionRestoreRequest(message: Record<string, unknown>): FediverseMiniAppSessionRestoreRequest | null {
+	if (!hasExactFields(message, [
+		'type',
+		'version',
+		'launchId',
+		'requestId',
+		'clientId',
+		'restoreChallenge',
+	])) return null;
+	if (typeof message.clientId !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(message.clientId)) return null;
+	if (typeof message.restoreChallenge !== 'string' || !restoreChallengePattern.test(message.restoreChallenge)) return null;
+
+	return {
+		requestId: message.requestId as string,
+		clientId: message.clientId,
+		restoreChallenge: message.restoreChallenge,
+	};
+}
+
 export function parseFediverseMiniAppPortMessage(
 	value: unknown,
 	launchId: string,
@@ -356,5 +402,44 @@ export function parseFediverseMiniAppPortMessage(
 		return { type: 'requestAuth', request };
 	}
 
+	if (value.type === 'restoreSession') {
+		if (typeof value.requestId !== 'string' || !requestIdPattern.test(value.requestId)) return { type: 'unknown' };
+		const request = validSessionRestoreRequest(value);
+		if (request == null) return { type: 'invalidRestoreSession', requestId: value.requestId };
+		return { type: 'restoreSession', request };
+	}
+
 	return { type: 'unknown' };
+}
+
+export function buildFediverseMiniAppSessionRestoreResult(
+	launchId: string,
+	requestId: string,
+	status: 'success' | 'interaction_required',
+	restoreCode?: string,
+): FediverseMiniAppSessionRestoreResult {
+	if (!launchIdPattern.test(launchId) || !requestIdPattern.test(requestId)) {
+		throw new TypeError('Invalid mini app session restore correlation');
+	}
+	if (status === 'success') {
+		if (typeof restoreCode !== 'string' || !restoreCodePattern.test(restoreCode)) {
+			throw new TypeError('Invalid mini app session restore code');
+		}
+		return {
+			type: 'sessionRestoreResult',
+			version: FEDIVERSE_MINI_APP_PROTOCOL_VERSION,
+			launchId,
+			requestId,
+			status,
+			restoreCode,
+		};
+	}
+	if (restoreCode != null) throw new TypeError('Unexpected mini app session restore code');
+	return {
+		type: 'sessionRestoreResult',
+		version: FEDIVERSE_MINI_APP_PROTOCOL_VERSION,
+		launchId,
+		requestId,
+		status,
+	};
 }

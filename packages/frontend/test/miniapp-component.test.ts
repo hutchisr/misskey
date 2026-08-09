@@ -5,7 +5,7 @@
 
 import { defineComponent, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/vue';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';
 import './init';
 import { components } from '@/components/index.js';
 import { directives } from '@/directives/index.js';
@@ -17,6 +17,7 @@ import type { ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
 
 const mocks = vi.hoisted(() => ({
 	authorize: vi.fn(),
+	misskeyApi: vi.fn(),
 }));
 
 vi.mock('@/utility/fediverse-miniapp-auth.js', async importOriginal => {
@@ -26,6 +27,10 @@ vi.mock('@/utility/fediverse-miniapp-auth.js', async importOriginal => {
 		authorizeFediverseMiniAppBackend: mocks.authorize,
 	};
 });
+
+vi.mock('@/utility/misskey-api.js', () => ({
+	misskeyApi: mocks.misskeyApi,
+}));
 
 vi.mock('@/utility/fediverse-miniapp.js', async importOriginal => {
 	const actual = await importOriginal<typeof import('@/utility/fediverse-miniapp.js')>();
@@ -80,6 +85,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	mocks.authorize.mockReset();
+	mocks.misskeyApi.mockReset();
 	hostPort = null;
 	popups.value = [];
 });
@@ -177,6 +183,122 @@ describe('MkMiniAppWindow authorization gate', () => {
 		expect(windowRoot.querySelector('.ti-rectangle')).not.toBeNull();
 		expect(view.container.querySelector('iframe')).toBeNull();
 		expect(view.getByRole('alert')).toBeTruthy();
+	});
+
+	test('restores an existing session without opening the authorization prompt', async () => {
+		const postMessage = vi.fn();
+		vi.spyOn(HTMLIFrameElement.prototype, 'contentWindow', 'get').mockReturnValue({ postMessage } as unknown as Window);
+		vi.stubGlobal('MessageChannel', class {
+			public port1 = hostPort = new FakePort();
+			public port2 = new FakePort();
+		});
+		mocks.misskeyApi
+			.mockResolvedValueOnce({ status: 'success', restoreCode: 'x'.repeat(43) })
+			.mockResolvedValueOnce({ status: 'interaction_required', restoreCode: null })
+			.mockRejectedValueOnce(new Error('restore unavailable'));
+
+		const view = render(MkMiniAppWindow, {
+			props: { resolved },
+			global: { components, directives },
+		});
+		const frame = await view.findByTitle('Open Farm Game') as HTMLIFrameElement;
+		await fireEvent.load(frame);
+		await new Promise(resolve => window.setTimeout(resolve, 0));
+		const bootstrap = postMessage.mock.calls.at(-1)?.[0] as { launchId?: unknown } | undefined;
+		const launchId = bootstrap?.launchId as string;
+		expect(launchId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+		hostPort!.onmessage?.({ data: { type: 'ready', version: '1', launchId } } as MessageEvent);
+		await nextTick();
+
+		const restoreRequest = {
+			type: 'restoreSession',
+			version: '1',
+			launchId,
+			requestId: 'r'.repeat(22),
+			clientId: 'ap3cl139zk',
+			restoreChallenge: 'c'.repeat(43),
+		};
+		hostPort!.onmessage?.({ data: restoreRequest } as MessageEvent);
+		await waitFor(() => expect(hostPort!.postMessage).toHaveBeenCalledWith({
+			type: 'sessionRestoreResult',
+			version: '1',
+			launchId,
+			requestId: 'r'.repeat(22),
+			status: 'success',
+			restoreCode: 'x'.repeat(43),
+		}));
+		expect(mocks.misskeyApi).toHaveBeenNthCalledWith(1, 'mini-apps/session-restores/create', {
+			clientId: 'ap3cl139zk',
+			manifestUrl: resolved.manifestUrl,
+			restoreChallenge: 'c'.repeat(43),
+		}, undefined, expect.any(AbortSignal));
+		expect(view.queryByRole('alertdialog')).toBeNull();
+
+		hostPort!.onmessage?.({
+			data: { ...restoreRequest, requestId: 's'.repeat(22) },
+		} as MessageEvent);
+		await waitFor(() => expect(hostPort!.postMessage).toHaveBeenCalledWith({
+			type: 'sessionRestoreResult',
+			version: '1',
+			launchId,
+			requestId: 's'.repeat(22),
+			status: 'interaction_required',
+		}));
+
+		hostPort!.onmessage?.({
+			data: { ...restoreRequest, requestId: 't'.repeat(22) },
+		} as MessageEvent);
+		await waitFor(() => expect(hostPort!.postMessage).toHaveBeenCalledWith({
+			type: 'sessionRestoreResult',
+			version: '1',
+			launchId,
+			requestId: 't'.repeat(22),
+			status: 'interaction_required',
+		}));
+		expect(mocks.misskeyApi).toHaveBeenCalledTimes(3);
+		expect(view.queryByRole('alertdialog')).toBeNull();
+	});
+
+	test('suppresses a stale restore result after the mini app closes', async () => {
+		const postMessage = vi.fn();
+		vi.spyOn(HTMLIFrameElement.prototype, 'contentWindow', 'get').mockReturnValue({ postMessage } as unknown as Window);
+		vi.stubGlobal('MessageChannel', class {
+			public port1 = hostPort = new FakePort();
+			public port2 = new FakePort();
+		});
+		let resolveRestore: ((value: { status: string; restoreCode: string }) => void) | undefined;
+		mocks.misskeyApi.mockReturnValueOnce(new Promise(resolve => {
+			resolveRestore = resolve;
+		}));
+
+		const view = render(MkMiniAppWindow, {
+			props: { resolved },
+			global: { components, directives },
+		});
+		const frame = await view.findByTitle('Open Farm Game') as HTMLIFrameElement;
+		await fireEvent.load(frame);
+		await new Promise(resolve => window.setTimeout(resolve, 0));
+		const launchId = postMessage.mock.calls.at(-1)?.[0].launchId as string;
+		hostPort!.onmessage?.({ data: { type: 'ready', version: '1', launchId } } as MessageEvent);
+		hostPort!.onmessage?.({
+			data: {
+				type: 'restoreSession',
+				version: '1',
+				launchId,
+				requestId: 'r'.repeat(22),
+				clientId: 'ap3cl139zk',
+				restoreChallenge: 'c'.repeat(43),
+			},
+		} as MessageEvent);
+		await waitFor(() => expect(mocks.misskeyApi).toHaveBeenCalledOnce());
+		const connectedPort = hostPort!;
+		view.unmount();
+
+		resolveRestore?.({ status: 'success', restoreCode: 'x'.repeat(43) });
+		await Promise.resolve();
+		await nextTick();
+		expect(connectedPort.close).toHaveBeenCalledOnce();
+		expect(connectedPort.postMessage).not.toHaveBeenCalled();
 	});
 
 	test('keeps requestAuth pending until a host button click and lets the user cancel', async () => {

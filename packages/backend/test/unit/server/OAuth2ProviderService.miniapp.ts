@@ -180,6 +180,7 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(service.generateRFC8414()).toMatchObject({
 			issuer,
 			fediverse_miniapp_profile: '1',
+			fediverse_miniapp_session_restore_endpoint: new URL('/api/v1/mini-apps/session-restores/consume', issuer),
 			registration_endpoint: new URL('/oauth/register', issuer),
 			revocation_endpoint: new URL('/oauth/revoke', issuer),
 			grant_types_supported: ['authorization_code', 'refresh_token'],

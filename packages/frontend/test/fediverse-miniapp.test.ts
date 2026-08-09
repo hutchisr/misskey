@@ -6,6 +6,7 @@
 import { describe, expect, test } from 'vitest';
 import {
 	buildFediverseMiniAppBootstrap,
+	buildFediverseMiniAppSessionRestoreResult,
 	createFediverseMiniAppLaunchId,
 	parseFediverseMiniAppPortMessage,
 	parseResolvedFediverseMiniApp,
@@ -181,5 +182,53 @@ describe('Fediverse Mini App protocol', () => {
 			...message,
 			padding: 'x'.repeat(33 * 1024),
 		}, launchId, resolvedResponse)).toEqual({ type: 'unknown' });
+	});
+
+	test('validates session restore requests and builds exact protocol results', () => {
+		const requestId = 'r'.repeat(22);
+		const message = {
+			type: 'restoreSession',
+			version: '1',
+			launchId,
+			requestId,
+			clientId: 'ap3cl139zk',
+			restoreChallenge: 'c'.repeat(43),
+		};
+
+		expect(parseFediverseMiniAppPortMessage(message, launchId, resolvedResponse)).toEqual({
+			type: 'restoreSession',
+			request: {
+				requestId,
+				clientId: 'ap3cl139zk',
+				restoreChallenge: 'c'.repeat(43),
+			},
+		});
+		expect(parseFediverseMiniAppPortMessage({
+			...message,
+			restoreChallenge: 'c'.repeat(42),
+		}, launchId, resolvedResponse)).toEqual({ type: 'invalidRestoreSession', requestId });
+		expect(parseFediverseMiniAppPortMessage({
+			...message,
+			extra: true,
+		}, launchId, resolvedResponse)).toEqual({ type: 'invalidRestoreSession', requestId });
+
+		const restoreCode = 'x'.repeat(43);
+		expect(buildFediverseMiniAppSessionRestoreResult(launchId, requestId, 'success', restoreCode)).toEqual({
+			type: 'sessionRestoreResult',
+			version: '1',
+			launchId,
+			requestId,
+			status: 'success',
+			restoreCode,
+		});
+		expect(buildFediverseMiniAppSessionRestoreResult(launchId, requestId, 'interaction_required')).toEqual({
+			type: 'sessionRestoreResult',
+			version: '1',
+			launchId,
+			requestId,
+			status: 'interaction_required',
+		});
+		expect(() => buildFediverseMiniAppSessionRestoreResult(launchId, requestId, 'success', 'short')).toThrow(TypeError);
+		expect(() => buildFediverseMiniAppSessionRestoreResult(launchId, requestId, 'interaction_required', restoreCode)).toThrow(TypeError);
 	});
 });

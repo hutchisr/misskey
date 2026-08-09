@@ -309,6 +309,7 @@ export * as 'invite/list' from './endpoints/invite/list.js';
 export * as 'meta' from './endpoints/meta.js';
 export * as 'mini-apps/list' from './endpoints/mini-apps/list.js';
 export * as 'mini-apps/resolve' from './endpoints/mini-apps/resolve.js';
+export * as 'mini-apps/session-restores/create' from './endpoints/mini-apps/session-restores/create.js';
 export * as 'miauth/gen-token' from './endpoints/miauth/gen-token.js';
 export * as 'mute/create' from './endpoints/mute/create.js';
 export * as 'mute/delete' from './endpoints/mute/delete.js';
@@ -424,6 +425,7 @@ export * as 'users/search-by-username-and-host' from './endpoints/users/search-b
 export * as 'users/show' from './endpoints/users/show.js';
 export * as 'users/update-memo' from './endpoints/users/update-memo.js';
 export * as 'v1/mini-apps/identity' from './endpoints/v1/mini-apps/identity.js';
+export * as 'v1/mini-apps/session-restores/consume' from './endpoints/v1/mini-apps/session-restores/consume.js';
 export * as 'v1/statuses' from './endpoints/v1/statuses.js';
 export * as 'verify-email' from './endpoints/verify-email.js';
 export * as 'chat/messages/create-to-user' from './endpoints/chat/messages/create-to-user.js';
