@@ -6,7 +6,6 @@
 import { defineComponent, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/vue';
-import './init';
 import MkSwitch from '@/components/MkSwitch.vue';
 
 afterEach(() => {
@@ -39,7 +38,7 @@ describe('MkSwitch', () => {
 			global: { directives: { tooltip: {} } },
 		});
 		const checkbox = view.getByRole('checkbox', { name: 'Enable Simple policy' }) as HTMLInputElement;
-		const visualToggle = view.container.querySelector<HTMLElement>('[data-cy-switch-toggle]');
+		const visualToggle = view.container.querySelector<HTMLElement>('[data-testid="switch-toggle"]');
 
 		expect(visualToggle).not.toBeNull();
 		expect(checkbox.checked).toBe(false);

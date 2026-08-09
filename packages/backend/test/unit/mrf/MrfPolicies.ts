@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { describe, expect, it } from 'vitest';
 import { defaultMrfPoliciesConfig } from '@/misc/mrf-config.js';
 import type { MrfPoliciesConfig } from '@/misc/mrf-config.js';
 import type { IActivity, IObject } from '@/core/activitypub/type.js';

@@ -15,6 +15,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div v-if="conversationLoading" style="padding: 16px">
 			<MkLoading/>
 		</div>
+		<div v-else-if="conversationLoadFailed" style="padding: 16px">
+			<MkButton style="margin: 0 auto;" primary rounded @click="loadConversation">{{ i18n.ts.retry }}</MkButton>
+		</div>
 		<MkNoteSub v-for="note in conversation" :key="note.id" :class="$style.replyToMore" :note="note"/>
 	</div>
 	<MkNoteSub v-if="appearNote.replyId" :note="appearNote?.reply ?? null" :class="$style.replyTo"/>
@@ -194,7 +197,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div v-if="repliesLoading" style="padding: 16px">
 					<MkLoading/>
 				</div>
-				<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply" :detail="true"/>
+				<div v-else-if="repliesLoadFailed" style="padding: 16px">
+					<MkButton style="margin: 0 auto;" primary rounded @click="loadReplies">{{ i18n.ts.retry }}</MkButton>
+				</div>
+				<MkNoteSub v-for="note in replies" :key="note.id" :note="note" :class="$style.reply"/>
 			</div>
 			<div v-else-if="tab === 'renotes'" :class="$style.tab_renotes">
 				<MkPagination :paginator="renotesPaginator" :forceDisableInfiniteScroll="true">
@@ -265,6 +271,7 @@ import MkInstanceTicker from '@/components/MkInstanceTicker.vue';
 import MkUserCardMini from '@/components/MkUserCardMini.vue';
 import MkPagination from '@/components/MkPagination.vue';
 import MkReactionIcon from '@/components/MkReactionIcon.vue';
+import MkButton from '@/components/MkButton.vue';
 
 const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
@@ -359,16 +366,20 @@ const reactionsPaginator = markRaw(new Paginator('notes/reactions', {
 const replies = ref<Misskey.entities.Note[]>([]);
 const repliesLoaded = ref(false);
 const repliesLoading = ref(false);
+const repliesLoadFailed = ref(false);
 
 function loadReplies() {
-	if (repliesLoaded.value) return;
+	if (repliesLoaded.value || repliesLoading.value) return;
 	repliesLoading.value = true;
-	misskeyApi('notes/children', {
+	repliesLoadFailed.value = false;
+	void misskeyApi('notes/children', {
 		noteId: appearNote.id,
 		limit: 30,
 	}).then(res => {
 		replies.value = res;
 		repliesLoaded.value = true;
+	}).catch(() => {
+		repliesLoadFailed.value = true;
 	}).finally(() => {
 		repliesLoading.value = false;
 	});
@@ -389,24 +400,28 @@ watch(tab, (newTab) => {
 const conversation = ref<Misskey.entities.Note[]>([]);
 const conversationLoaded = ref(false);
 const conversationLoading = ref(false);
+const conversationLoadFailed = ref(false);
 
 function loadConversation() {
-	if (conversationLoaded.value) return;
-	conversationLoading.value = true;
-	conversationLoaded.value = true;
+	if (conversationLoaded.value || conversationLoading.value) return;
 	if (appearNote.replyId == null) {
-		conversationLoading.value = false;
+		conversationLoaded.value = true;
 		return;
 	}
-	misskeyApi('notes/conversation', {
+	conversationLoading.value = true;
+	conversationLoadFailed.value = false;
+	void misskeyApi('notes/conversation', {
 		noteId: appearNote.replyId,
 	}).then(res => {
 		conversation.value = res.reverse();
+		conversationLoaded.value = true;
 		nextTick(() => {
 			if (noteEl.value) {
 				noteEl.value.scrollIntoView({ behavior: 'instant', block: 'start' });
 			}
 		});
+	}).catch(() => {
+		conversationLoadFailed.value = true;
 	}).finally(() => {
 		conversationLoading.value = false;
 	});
