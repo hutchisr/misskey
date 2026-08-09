@@ -792,6 +792,7 @@ export class OAuth2ProviderService implements OnApplicationShutdown {
 			code_challenge_methods_supported: ['S256'],
 			authorization_response_iss_parameter_supported: true,
 			fediverse_miniapp_profile: '1',
+			fediverse_miniapp_session_restore_endpoint: new URL('/api/v1/mini-apps/session-restores/consume', this.config.url),
 		};
 	}
 

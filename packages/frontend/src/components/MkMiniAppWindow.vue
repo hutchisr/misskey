@@ -75,18 +75,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import { computed, nextTick, onDeactivated, onMounted, onUnmounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
-import type { FediverseMiniAppAuthorizationRequest, FediverseMiniAppBootstrap, ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
+import type { FediverseMiniAppAuthorizationRequest, FediverseMiniAppBootstrap, FediverseMiniAppSessionRestoreRequest, ResolvedFediverseMiniApp } from '@/utility/fediverse-miniapp.js';
 import MkButton from '@/components/MkButton.vue';
 import MkLoading from '@/components/global/MkLoading.vue';
 import MkWindow from '@/components/MkWindow.vue';
 import { i18n } from '@/i18n.js';
 import {
 	buildFediverseMiniAppBootstrap,
+	buildFediverseMiniAppSessionRestoreResult,
 	createFediverseMiniAppLaunchId,
 	FEDIVERSE_MINI_APP_READY_TIMEOUT_MS,
 	parseFediverseMiniAppPortMessage,
 } from '@/utility/fediverse-miniapp.js';
 import { authorizeFediverseMiniAppBackend, buildFediverseMiniAppAuthResult, FEDIVERSE_MINI_APP_AUTH_TIMEOUT_MS } from '@/utility/fediverse-miniapp-auth.js';
+import { misskeyApi } from '@/utility/misskey-api.js';
 import { resolveFediverseMiniApp } from '@/utility/resolve-fediverse-miniapp.js';
 
 const props = defineProps<{
@@ -126,6 +128,7 @@ let sessionSequence = 0;
 let recentMessageTimes: number[] = [];
 let launchAbortController: AbortController | null = null;
 let authAbortController: AbortController | null = null;
+let sessionRestoreAbortController: AbortController | null = null;
 let pendingAuthorizationTimer: number | null = null;
 let authorizationReturnFocus: HTMLElement | null = null;
 let authorizationFocusChange = 0;
@@ -212,6 +215,8 @@ function stopSession(): void {
 	launchAbortController = null;
 	authAbortController?.abort();
 	authAbortController = null;
+	sessionRestoreAbortController?.abort();
+	sessionRestoreAbortController = null;
 	clearPendingAuthorizationTimer();
 	pendingAuthorization.value = null;
 	authInProgress.value = false;
@@ -309,6 +314,18 @@ function onPortMessage(event: MessageEvent, sequence: number): void {
 		postAuthResult(message.requestId, 'invalid_request');
 		return;
 	}
+	if (message.type === 'invalidRestoreSession') {
+		postSessionRestoreResult(message.requestId, 'interaction_required');
+		return;
+	}
+	if (message.type === 'restoreSession') {
+		if (phase.value !== 'ready' || sessionRestoreAbortController != null) {
+			postSessionRestoreResult(message.request.requestId, 'interaction_required');
+			return;
+		}
+		requestSessionRestore(message.request, sequence, launchId);
+		return;
+	}
 	if (message.type === 'requestAuth') {
 		if (phase.value !== 'ready') {
 			postAuthResult(message.request.requestId, 'invalid_request');
@@ -332,6 +349,38 @@ function onPortMessage(event: MessageEvent, sequence: number): void {
 		const pending = pendingAuthorization.value;
 		pendingAuthorizationTimer = window.setTimeout(() => expirePendingAuthorization(pending), FEDIVERSE_MINI_APP_AUTH_TIMEOUT_MS);
 	}
+}
+
+function requestSessionRestore(request: FediverseMiniAppSessionRestoreRequest, sequence: number, currentLaunchId: string): void {
+	const controller = new AbortController();
+	sessionRestoreAbortController = controller;
+	void misskeyApi('mini-apps/session-restores/create', {
+		clientId: request.clientId,
+		manifestUrl: activeResolved.value.manifestUrl,
+		restoreChallenge: request.restoreChallenge,
+	}, undefined, controller.signal).then(result => {
+		if (
+			controller !== sessionRestoreAbortController ||
+			controller.signal.aborted ||
+			sequence !== sessionSequence ||
+			currentLaunchId !== launchId
+		) return;
+		sessionRestoreAbortController = null;
+		if (result.status === 'success' && result.restoreCode != null) {
+			postSessionRestoreResult(request.requestId, 'success', result.restoreCode);
+		} else {
+			postSessionRestoreResult(request.requestId, 'interaction_required');
+		}
+	}).catch(() => {
+		if (
+			controller !== sessionRestoreAbortController ||
+			controller.signal.aborted ||
+			sequence !== sessionSequence ||
+			currentLaunchId !== launchId
+		) return;
+		sessionRestoreAbortController = null;
+		postSessionRestoreResult(request.requestId, 'interaction_required');
+	});
 }
 
 function approvePendingAuthorization(): void {
@@ -457,6 +506,23 @@ function postAuthResult(requestId: string, status: 'success' | 'cancelled' | 'er
 	try {
 		port.postMessage(buildFediverseMiniAppAuthResult(launchId, requestId, status, handoffCode));
 	} catch {
+		failSession(i18n.ts._miniApps.launchFailed);
+	}
+}
+
+function postSessionRestoreResult(requestId: string, status: 'success' | 'interaction_required', restoreCode?: string): void {
+	if (port == null || launchId == null) return;
+	try {
+		port.postMessage(buildFediverseMiniAppSessionRestoreResult(launchId, requestId, status, restoreCode));
+	} catch {
+		if (status === 'success') {
+			try {
+				port.postMessage(buildFediverseMiniAppSessionRestoreResult(launchId, requestId, 'interaction_required'));
+				return;
+			} catch {
+				// Fall through to the runtime error below.
+			}
+		}
 		failSession(i18n.ts._miniApps.launchFailed);
 	}
 }

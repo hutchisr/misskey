@@ -11,11 +11,13 @@
 - Fix: 「もっと！」メニューで Fediverse Mini App のアイコンとゲームパッドが重なって表示される問題を修正
 - Fix: 1つのノートに同じ Fediverse Mini App へのリンクが複数あると起動ボタンが重複して表示される問題を修正
 - Fix: 動的登録された OAuth クライアントで Fediverse Mini App の認証を開始できない問題を修正
+- Enhance: Fediverse Mini Apps の既存セッションを再認証なしで復元できるように
 
 ### Server
 - Feat: Fediverse Mini Apps V1 向けのマニフェスト検証、OAuth、認証APIに対応
 - Enhance: OAuth 2.0 Dynamic Client Registration (RFC 7591) に対応し、Mini App マニフェストを任意の拡張メタデータとして登録できるように
 - Enhance: 動的登録された Fediverse Mini Apps の情報を OAuth クライアントと認可情報から取得するように
+- Enhance: Fediverse Mini Apps 向けの検証コード方式セッション復元APIに対応
 
 ## 2026.7.0
 

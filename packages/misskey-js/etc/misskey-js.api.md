@@ -2025,6 +2025,8 @@ declare namespace entities {
         MiniAppsListResponse,
         MiniAppsResolveRequest,
         MiniAppsResolveResponse,
+        MiniAppsSessionRestoresCreateRequest,
+        MiniAppsSessionRestoresCreateResponse,
         MuteCreateRequest,
         MuteDeleteRequest,
         MuteListRequest,
@@ -2201,6 +2203,8 @@ declare namespace entities {
         UsersShowResponse,
         UsersUpdateMemoRequest,
         V1MiniAppsIdentityResponse,
+        V1MiniAppsSessionRestoresConsumeRequest,
+        V1MiniAppsSessionRestoresConsumeResponse,
         V1StatusesRequest,
         V1StatusesResponse,
         V2AdminEmojiListRequest,
@@ -2891,8 +2895,6 @@ type MiauthGenTokenRequest = operations['miauth___gen-token']['requestBody']['co
 // @public (undocumented)
 type MiauthGenTokenResponse = operations['miauth___gen-token']['responses']['200']['content']['application/json'];
 
-// Warning: (ae-forgotten-export) The symbol "ModerationLogPayloads" needs to be exported by the entry point index.d.ts
-//
 // @public (undocumented)
 export const miniAppPermissions: readonly ["identify", "write"];
 
@@ -2908,6 +2910,14 @@ type MiniAppsResolveRequest = operations['mini-apps___resolve']['requestBody']['
 // @public (undocumented)
 type MiniAppsResolveResponse = operations['mini-apps___resolve']['responses']['200']['content']['application/json'];
 
+// @public (undocumented)
+type MiniAppsSessionRestoresCreateRequest = operations['mini-apps___session-restores___create']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type MiniAppsSessionRestoresCreateResponse = operations['mini-apps___session-restores___create']['responses']['200']['content']['application/json'];
+
+// Warning: (ae-forgotten-export) The symbol "ModerationLogPayloads" needs to be exported by the entry point index.d.ts
+//
 // @public (undocumented)
 type ModerationLog = {
     id: ID;
@@ -3783,6 +3793,12 @@ type UserWebhook = components['schemas']['UserWebhook'];
 
 // @public (undocumented)
 type V1MiniAppsIdentityResponse = operations['v1___mini-apps___identity']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type V1MiniAppsSessionRestoresConsumeRequest = operations['v1___mini-apps___session-restores___consume']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type V1MiniAppsSessionRestoresConsumeResponse = operations['v1___mini-apps___session-restores___consume']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type V1StatusesRequest = operations['v1___statuses']['requestBody']['content']['application/json'];

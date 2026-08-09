@@ -3629,6 +3629,18 @@ declare module '../api.js' {
     ): Promise<SwitchCaseResponseType<E, P>>;
 
     /**
+     * Create a short-lived, one-time Mini App session restore proof for an existing authorization.
+     *
+     * **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+     * **Credential required**: *Yes* / **Permission**: *read:account*
+     */
+    request<E extends 'mini-apps/session-restores/create', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
      * No description provided.
      *
      * **Credential required**: *Yes* / **Permission**: *write:mutes*
@@ -4881,6 +4893,17 @@ declare module '../api.js' {
      * **Credential required**: *Yes* / **Permission**: *identify*
      */
     request<E extends 'v1/mini-apps/identity', P extends Endpoints[E]['req']>(
+      endpoint: E,
+      params: P,
+      credential?: string | null,
+    ): Promise<SwitchCaseResponseType<E, P>>;
+
+    /**
+     * Consume a short-lived, one-time Mini App session restore proof.
+     *
+     * **Credential required**: *No*
+     */
+    request<E extends 'v1/mini-apps/session-restores/consume', P extends Endpoints[E]['req']>(
       endpoint: E,
       params: P,
       credential?: string | null,
