@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { afterEach, describe, expect, test, vi } from 'vitest';
-import './init';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { resolveFediverseMiniApp } from '@/utility/resolve-fediverse-miniapp.js';
 
 const account = vi.hoisted(() => ({
@@ -55,9 +54,10 @@ function resolvedResponse(appOrigin: string, launchUrl: string): object {
 	};
 }
 
-afterEach(() => {
+beforeEach(() => {
 	account.value = { token: 'test-token' };
 	fetchMock.resetMocks();
+	fetchMock.doMock();
 });
 
 describe('resolveFediverseMiniApp', () => {
