@@ -9,7 +9,7 @@ import { DI } from '@/di-symbols.js';
 import type { MiMeta } from '@/models/Meta.js';
 import { bindThis } from '@/decorators.js';
 import { getApType } from '@/core/activitypub/type.js';
-import type { IActivity, IObject } from '@/core/activitypub/type.js';
+import type { IActivity } from '@/core/activitypub/type.js';
 import type { MrfPolicy, MrfResult, MrfKeywordPolicyConfig } from './types.js';
 
 @Injectable()
@@ -33,7 +33,9 @@ export class MrfKeywordPolicyService implements MrfPolicy {
 		const object = activity.object;
 		if (typeof object !== 'object' || object === null) return null;
 
-		return (object as IObject).content ?? (object as IObject).summary ?? null;
+		if ('content' in object && typeof object.content === 'string') return object.content;
+		if ('summary' in object && typeof object.summary === 'string') return object.summary;
+		return null;
 	}
 
 	private testPattern(text: string, pattern: string): boolean {
@@ -77,8 +79,12 @@ export class MrfKeywordPolicyService implements MrfPolicy {
 
 		// Apply replacements
 		if (config.replace.length > 0) {
-			const object = activity.object as IObject;
-			let newContent = object.content ?? '';
+			const object = activity.object;
+			if (typeof object !== 'object' || object === null || !('content' in object) || typeof object.content !== 'string') {
+				return { action: 'accept', activity };
+			}
+
+			let newContent = object.content;
 			for (const { pattern, replacement } of config.replace) {
 				newContent = this.replacePattern(newContent, pattern, replacement);
 			}

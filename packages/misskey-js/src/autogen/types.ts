@@ -13163,24 +13163,24 @@ export interface operations {
                     remoteNotesCleaningMaxProcessingDurationInMinutes?: number;
                     showRoleBadgesOfRemoteUsers?: boolean;
                     mrfPolicies?: {
-                        enabled?: string[];
-                        simple?: {
-                            reject?: string[];
-                            mediaRemoval?: string[];
-                            mediaNsfw?: string[];
-                            reportRemoval?: string[];
-                            followersOnly?: string[];
+                        enabled: string[];
+                        simple: {
+                            reject: string[];
+                            mediaRemoval: string[];
+                            mediaNsfw: string[];
+                            reportRemoval: string[];
+                            followersOnly: string[];
                         };
-                        keyword?: {
-                            reject?: string[];
-                            replace?: {
+                        keyword: {
+                            reject: string[];
+                            replace: {
                                 pattern: string;
                                 replacement: string;
                             }[];
                         };
-                        hellthread?: {
-                            rejectThreshold?: number;
-                            delistThreshold?: number;
+                        hellthread: {
+                            rejectThreshold: number;
+                            delistThreshold: number;
                         };
                     };
                 };

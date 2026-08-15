@@ -30,6 +30,52 @@ describe('Endpoints', () => {
 		await api('admin/update-meta', { federation: 'all' }, alice as misskey.entities.SignupResponse);
 	}, 1000 * 60 * 2);
 
+	describe('admin/update-meta', () => {
+		test('rejects incomplete MRF policy configuration', async () => {
+			// Deliberately bypass the generated client type to exercise server-side validation.
+			const invalidRequest = {
+				mrfPolicies: {
+					enabled: ['simple'],
+					simple: {
+						reject: [],
+					},
+					keyword: {
+						reject: [],
+						replace: [],
+					},
+					hellthread: {
+						rejectThreshold: 0,
+						delistThreshold: 0,
+					},
+				},
+			} as unknown as misskey.Endpoints['admin/update-meta']['req'];
+			const response = await api('admin/update-meta', invalidRequest, alice);
+
+			await api('admin/update-meta', {
+				mrfPolicies: {
+					enabled: [],
+					simple: {
+						reject: [],
+						mediaRemoval: [],
+						mediaNsfw: [],
+						reportRemoval: [],
+						followersOnly: [],
+					},
+					keyword: {
+						reject: [],
+						replace: [],
+					},
+					hellthread: {
+						rejectThreshold: 0,
+						delistThreshold: 0,
+					},
+				},
+			}, alice);
+
+			assert.strictEqual(response.status, 400);
+		});
+	});
+
 	describe('signup', () => {
 		test('不正なユーザー名でアカウントが作成できない', async () => {
 			const res = await api('signup', {

@@ -218,6 +218,24 @@ describe('MrfKeywordPolicyService', () => {
 			const result = service.filterActivity(createActivity());
 			expect(result.action).toBe('accept');
 		});
+
+		it('should accept activities with non-string content', () => {
+			const meta = createMockMeta({
+				...defaultMrfPoliciesConfig,
+				keyword: { ...defaultMrfPoliciesConfig.keyword, reject: ['badword'] },
+			});
+			const service = new MrfKeywordPolicyService(meta);
+			const activity = createActivity();
+			const malformedContent = { unexpected: true };
+			(activity.object as IObject).content = malformedContent as unknown as string;
+
+			const result = service.filterActivity(activity);
+
+			expect(result.action).toBe('accept');
+			if (result.action === 'accept') {
+				expect((result.activity.object as IObject).content).toBe(malformedContent);
+			}
+		});
 	});
 
 	describe('replace', () => {
@@ -254,6 +272,28 @@ describe('MrfKeywordPolicyService', () => {
 			expect(result.action).toBe('accept');
 			if (result.action === 'accept') {
 				expect((result.activity.object as IObject).content).toBe('good and good');
+			}
+		});
+
+		it('should not replace non-string content', () => {
+			const meta = createMockMeta({
+				...defaultMrfPoliciesConfig,
+				keyword: {
+					...defaultMrfPoliciesConfig.keyword,
+					replace: [{ pattern: 'naughty', replacement: 'nice' }],
+				},
+			});
+			const service = new MrfKeywordPolicyService(meta);
+			const activity = createActivity();
+			const malformedContent = { unexpected: true };
+			(activity.object as IObject).content = malformedContent as unknown as string;
+			(activity.object as IObject).summary = 'naughty summary';
+
+			const result = service.filterActivity(activity);
+
+			expect(result.action).toBe('accept');
+			if (result.action === 'accept') {
+				expect((result.activity.object as IObject).content).toBe(malformedContent);
 			}
 		});
 	});

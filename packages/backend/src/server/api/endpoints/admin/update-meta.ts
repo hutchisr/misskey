@@ -245,6 +245,7 @@ export const paramDef = {
 						reportRemoval: { type: 'array', items: { type: 'string' } },
 						followersOnly: { type: 'array', items: { type: 'string' } },
 					},
+					required: ['reject', 'mediaRemoval', 'mediaNsfw', 'reportRemoval', 'followersOnly'],
 				},
 				keyword: {
 					type: 'object',
@@ -262,6 +263,7 @@ export const paramDef = {
 							},
 						},
 					},
+					required: ['reject', 'replace'],
 				},
 				hellthread: {
 					type: 'object',
@@ -269,8 +271,10 @@ export const paramDef = {
 						rejectThreshold: { type: 'integer' },
 						delistThreshold: { type: 'integer' },
 					},
+					required: ['rejectThreshold', 'delistThreshold'],
 				},
 			},
+			required: ['enabled', 'simple', 'keyword', 'hellthread'],
 		},
 	},
 	required: [],

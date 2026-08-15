@@ -20,6 +20,7 @@
 - Enhance: 動的登録された Fediverse Mini Apps の情報を OAuth クライアントと認可情報から取得するように
 - Enhance: Fediverse Mini Apps 向けの検証コード方式セッション復元APIに対応
 - Fix: Fediverse Mini Apps の OAuth 認証後に標準のアカウント確認APIを利用できない問題を修正
+- Fix: MRF設定APIで不完全なポリシー設定を受け付ける問題と、不正なActivityPub本文でキーワードポリシーが失敗する問題を修正
 
 ## 2026.7.0
 
