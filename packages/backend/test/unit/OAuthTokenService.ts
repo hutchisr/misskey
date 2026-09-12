@@ -166,6 +166,35 @@ describe('OAuthTokenService', () => {
 		expect(harness.grants).toHaveLength(0);
 	});
 
+	test('self-revocation requires credentials and cannot revoke another token family', async () => {
+		const harness = createHarness();
+		const issued = await harness.service.issueAuthorization({
+			userId: 'user1',
+			clientId: 'oauth-client',
+			clientKind: 'oauth',
+			clientName: 'OAuth Client',
+			scope: ['read:account'],
+			authorizationExpiresAt: new Date(Date.now() + 3_600_000),
+		});
+		const other = await issue(harness);
+		const token = harness.accessTokens[0] as MiAccessToken;
+		const endpoint = new RevokeTokenEndpoint({
+			findOneBy: async (criteria: ObjectLiteral) => harness.accessTokens.find(value => matches(value, criteria)) ?? null,
+		} as unknown as AccessTokensRepository, harness.service);
+		const user = { id: 'user1', host: null, uri: null } as MiLocalUser;
+
+		await expect(endpoint.exec({ tokenId: token.id }, null, null)).rejects.toMatchObject({ code: 'CREDENTIAL_REQUIRED' });
+		await expect(endpoint.exec({ tokenId: other.grantId }, user, token)).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+		expect(harness.accessTokens.map(value => value.id)).toEqual([issued.grantId, other.grantId]);
+		expect(harness.grants.map(value => value.grantId)).toEqual([issued.grantId, other.grantId]);
+
+		await endpoint.exec({ token: issued.response.access_token }, user, token);
+		await expect(harness.service.refreshAuthorization(issued.response.refresh_token, 'oauth-client')).rejects.toMatchObject({ error: 'invalid_grant' });
+		const refreshed = await harness.service.refreshAuthorization(other.response.refresh_token, 'https://farm.example/.well-known/fediverse-miniapp.json');
+		expect(refreshed.access_token).not.toBe(other.response.access_token);
+		expect(harness.accessTokens.map(value => value.id)).toEqual([other.grantId]);
+	});
+
 	test('a wrong client cannot rotate or revoke the legitimate family', async () => {
 		const harness = createHarness();
 		const issued = await issue(harness);
