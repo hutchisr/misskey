@@ -215,6 +215,8 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		expect(response.json().client_id_issued_at).toEqual(expect.any(Number));
 		expect(insertOAuthClient).toHaveBeenCalledWith(expect.objectContaining({ kind: 'miniapp' }));
 		expect(response.headers['cache-control']).toBe('no-store');
+		expect(response.headers['x-frame-options']).toBe('DENY');
+		expect(response.headers['content-security-policy']).toBe("frame-ancestors 'none'");
 		expect(response.headers['content-length']).toBeDefined();
 		expect(response.headers['transfer-encoding']).toBeUndefined();
 	});
@@ -542,6 +544,8 @@ describe('OAuth2ProviderService Fediverse Mini App profile', () => {
 		});
 		const authorization = await fastify.inject({ method: 'GET', url: `/oauth/authorize?${query}` });
 		expect(authorization.statusCode).toBe(200);
+		expect(authorization.headers['x-frame-options']).toBe('DENY');
+		expect(authorization.headers['content-security-policy']).toBe("frame-ancestors 'none'");
 		expect(authorization.body).toContain('misskey:oauth:authorization-lifetime-seconds');
 
 		const decision = await fastify.inject({
