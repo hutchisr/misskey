@@ -338,6 +338,18 @@ id: 'aidx'
 #  options:
 #    dsn: 'https://examplePublicKey@o0.ingest.sentry.io/0'
 
+# Optional native backend tracing, independent of Sentry (traces only, no metrics/logs).
+# Exports API endpoint and queue job spans using OTLP HTTP/protobuf.
+# No request bodies/headers, user IDs, SQL parameters, messages or error payloads
+# are captured, and no trace headers are propagated to ActivityPub/other hosts.
+# Sentry's separately configured capture behavior is unchanged.
+#otelForBackend:
+#  # Full HTTP(S) trace endpoint; use a trusted private collector.
+#  endpoint: 'http://otel-collector:4318/v1/traces'
+#  serviceName: 'misskey' # Default
+#  sampleRate: 0.1 # Default; finite number from 0 (disabled) to 1 (all traces)
+# Buffered spans are flushed on shutdown with a five-second wait limit.
+
 #   ┌─────────────────────┐
 #───┘ Other configuration └─────────────────────────────────────
 

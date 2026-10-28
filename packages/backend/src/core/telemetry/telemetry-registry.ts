@@ -6,6 +6,7 @@
 import type { Config } from '@/config.js';
 import { setLogTraceContextProvider } from '@/logging/logging-runtime.js';
 import { SentryTelemetryAdapter } from './adapters/SentryTelemetryAdapter.js';
+import { OtelTelemetryAdapter } from './adapters/OtelTelemetryAdapter.js';
 import type { TelemetryAdapter, TelemetryCaptureMessageOptions } from './adapters/TelemetryAdapter.js';
 
 /**
@@ -22,6 +23,14 @@ export async function initTelemetry(config: Config): Promise<void> {
 		// Telemetryの初期化後に登録し、初期化前のBootstrapログは従来どおり出力する。
 		setLogTraceContextProvider(() => adapter.getActiveTraceContext?.());
 	}
+	if (config.otelForBackend) {
+		const adapter = new OtelTelemetryAdapter(config.otelForBackend);
+		adapters.push(adapter);
+		// Keep Sentry's existing log correlation when both backends are enabled.
+		if (!config.sentryForBackend) {
+			setLogTraceContextProvider(() => adapter.getActiveTraceContext());
+		}
+	}
 }
 
 export function captureMessage(message: string, opts: TelemetryCaptureMessageOptions): void {
@@ -37,7 +46,7 @@ export function startSpan<T>(name: string, fn: () => T): T {
 	if (adapters.length === 0) return fn();
 	if (adapters.length === 1) return adapters[0].startSpan(name, fn);
 
-	// 将来複数adapterを登録する場合でも同じ処理を入れ子にラップし、呼び出し側のAPIは1回のstartSpanに保つ。
+	// 複数adapterでも同じ処理を入れ子にラップし、呼び出し側のAPIは1回のstartSpanに保つ。
 	const wrapped = adapters.reduceRight<() => T>(
 		(inner, adapter) => () => adapter.startSpan(name, inner),
 		fn,

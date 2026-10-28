@@ -30,6 +30,12 @@ type SentryBackendConfig = {
 	disabledIntegrations?: string[];
 };
 
+type OtelBackendConfig = {
+	endpoint: string;
+	serviceName?: string;
+	sampleRate?: number;
+};
+
 /**
  * 設定ファイルの型
  */
@@ -75,6 +81,7 @@ type Source = {
 		scope?: 'local' | 'global' | string[];
 	};
 	sentryForBackend?: SentryBackendConfig;
+	otelForBackend?: OtelBackendConfig;
 	sentryForFrontend?: {
 		options: Partial<SentryVue.BrowserOptions> & { dsn: string };
 		vueIntegration?: SentryVue.VueIntegrationOptions | null;
@@ -220,6 +227,7 @@ export type Config = {
 	redisForTimelines: RedisOptionsResolved;
 	redisForReactions: RedisOptionsResolved;
 	sentryForBackend: SentryBackendConfig | undefined;
+	otelForBackend?: OtelBackendConfig;
 	sentryForFrontend: {
 		options: Partial<SentryVue.BrowserOptions> & { dsn: string };
 		vueIntegration?: SentryVue.VueIntegrationOptions | null;
@@ -325,6 +333,7 @@ export function loadConfig(): Config {
 		redisForTimelines: config.redisForTimelines ? convertRedisOptions(config.redisForTimelines, host) : redis,
 		redisForReactions: config.redisForReactions ? convertRedisOptions(config.redisForReactions, host) : redis,
 		sentryForBackend: config.sentryForBackend,
+		otelForBackend: config.otelForBackend,
 		sentryForFrontend: config.sentryForFrontend,
 		id: config.id,
 		proxy: config.proxy,
