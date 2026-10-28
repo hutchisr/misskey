@@ -39,10 +39,13 @@ function reload() {
 }
 
 if (store.s.realtimeMode) {
-	useStream().on('_disconnected_', onDisconnected);
+	const stream = useStream();
+	stream.on('_disconnected_', onDisconnected);
+	stream.on('_connected_', resetDisconnected);
 
 	onUnmounted(() => {
-		useStream().off('_disconnected_', onDisconnected);
+		stream.off('_disconnected_', onDisconnected);
+		stream.off('_connected_', resetDisconnected);
 	});
 }
 </script>
