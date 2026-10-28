@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+// The Mini App protocol tests need their local about:blank iframe to load.
+// @vitest-environment-options {"settings":{"enableIframePageLoading":true}}
+
 import { defineComponent, nextTick, ref } from 'vue';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue';

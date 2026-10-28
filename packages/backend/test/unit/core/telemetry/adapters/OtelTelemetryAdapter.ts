@@ -147,7 +147,12 @@ describe('native OTLP tracing', () => {
 				const child = exported.find(span => span.name === name)!;
 				expect(child.traceId).toBe(parent.traceId);
 				expect(child.parentSpanId).toBe(parent.spanId);
-				expect(BigInt(parent.endTimeUnixNano)).toBeGreaterThanOrEqual(BigInt(child.endTimeUnixNano));
+				// The SDK samples wall-clock time separately for each span, so
+				// sub-millisecond timestamp differences cannot establish end order.
+				// BatchSpanProcessor exports spans in the order they actually end.
+				expect(exported.indexOf(child)).toBeLessThan(exported.indexOf(parent));
+				expect(BigInt(child.endTimeUnixNano)).toBeGreaterThanOrEqual(BigInt(child.startTimeUnixNano));
+				expect(BigInt(parent.endTimeUnixNano)).toBeGreaterThanOrEqual(BigInt(parent.startTimeUnixNano));
 				expect(BigInt(child.startTimeUnixNano)).toBeGreaterThanOrEqual(BigInt(parent.startTimeUnixNano));
 			}
 			expect(exports()[0].resourceSpans[0].resource.attributes).toContainEqual({ key: 'service.name', value: { stringValue: 'misskey-test' } });
