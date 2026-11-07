@@ -4,12 +4,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkA v-user-preview="canonical" :class="[$style.root, { [$style.isMe]: isMe }]" :to="url" :behavior="navigationBehavior">
+<MkA v-user-preview="canonical" :class="[$style.root, { [$style.isMe]: isMe }]" :to="url" :behavior="navigationBehavior" :title="canonical">
 	<img :class="$style.icon" :src="avatarUrl" alt="">
-	<span>
-		<span>@{{ username }}</span>
-		<span v-if="(host != localHost)" :class="$style.host">@{{ toUnicode(host) }}</span>
-	</span>
+	<span :class="$style.username">@{{ username }}</span>
+	<span v-if="(host != localHost)" :class="$style.host">@{{ toUnicode(host) }}</span>
 </MkA>
 </template>
 
@@ -44,7 +42,11 @@ const avatarUrl = computed(() => prefer.s.disableShowingAnimatedImages || prefer
 
 <style lang="scss" module>
 .root {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
+	max-width: 100%;
+	box-sizing: border-box;
+	vertical-align: bottom;
 	padding: 4px 8px 4px 4px;
 	border-radius: 999px;
 	color: var(--MI_THEME-mention);
@@ -57,12 +59,24 @@ const avatarUrl = computed(() => prefer.s.disableShowingAnimatedImages || prefer
 }
 
 .icon {
+	flex-shrink: 0;
 	width: 1.5em;
 	height: 1.5em;
 	object-fit: cover;
 	margin: 0 0.2em 0 0;
-	vertical-align: bottom;
 	border-radius: 100%;
+}
+
+.username {
+	max-width: 16ch;
+}
+
+.username,
+.host {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .host {
