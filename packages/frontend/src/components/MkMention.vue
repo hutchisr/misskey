@@ -43,10 +43,10 @@ const avatarUrl = computed(() => prefer.s.disableShowingAnimatedImages || prefer
 <style lang="scss" module>
 .root {
 	display: inline-flex;
-	align-items: center;
+	align-items: baseline;
 	max-width: 100%;
 	box-sizing: border-box;
-	vertical-align: bottom;
+	vertical-align: baseline;
 	padding: 4px 8px 4px 4px;
 	border-radius: 999px;
 	color: var(--MI_THEME-mention);
@@ -60,6 +60,7 @@ const avatarUrl = computed(() => prefer.s.disableShowingAnimatedImages || prefer
 
 .icon {
 	flex-shrink: 0;
+	align-self: center;
 	width: 1.5em;
 	height: 1.5em;
 	object-fit: cover;
