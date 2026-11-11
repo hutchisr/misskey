@@ -59,6 +59,7 @@ export interface IPaginator<T = unknown, _T = T & MisskeyEntity> {
 	reload(): Promise<void>;
 	fetchOlder(): Promise<void>;
 	fetchNewer(options?: { toQueue?: boolean }): Promise<void>;
+	catchUp(options?: { toQueue?: boolean | (() => boolean); signal?: AbortSignal }): Promise<void>;
 	trim(trigger?: boolean): void;
 	unshiftItems(newItems: (_T)[]): void;
 	pushItems(oldItems: (_T)[]): void;
@@ -107,6 +108,9 @@ export class Paginator<
 	private canFetchDetection: 'safe' | 'limit' | null = null;
 	private aheadQueue: T[] = [];
 	private useShallowRef: SRef;
+	private catchUpGeneration = 0;
+	private catchUpSinceId: string | null | undefined;
+	private pendingCatchUp: Parameters<IPaginator['catchUp']>[0] | null = null;
 
 	// 配列内の要素をどのような順序で並べるか
 	// newest: 新しいものが先頭 (default)
@@ -191,6 +195,9 @@ export class Paginator<
 	}
 
 	public async init(): Promise<void> {
+		this.catchUpGeneration++;
+		this.catchUpSinceId = undefined;
+		this.fetchingNewer.value = false;
 		this.items.value = [];
 		this.aheadQueue = [];
 		this.queuedAheadItemsCount.value = 0;
@@ -251,6 +258,11 @@ export class Paginator<
 
 		this.error.value = false;
 		this.fetching.value = false;
+		if (this.pendingCatchUp) {
+			const options = this.pendingCatchUp;
+			this.pendingCatchUp = null;
+			await this.catchUp(options);
+		}
 	}
 
 	public reload(): Promise<void> {
@@ -361,6 +373,66 @@ export class Paginator<
 		}
 		// canFetchDetectionが'safe'の場合・apiRes.length === 0 の場合は apiRes.length === 0 の場合に canFetchNewer.value = false になるが、
 		// 余計な re-render を防ぐために上部で処理している。そのため、ここでは何もしない
+	}
+
+	/** Recover an ID-paginated stream without letting live arrivals advance the replay cursor. */
+	public async catchUp(options: { toQueue?: boolean | (() => boolean); signal?: AbortSignal } = {}): Promise<void> {
+		if (options.signal?.aborted) return;
+		if (this.fetching.value) {
+			this.pendingCatchUp = options;
+			return;
+		}
+		const generation = ++this.catchUpGeneration;
+		if (this.catchUpSinceId === undefined) this.catchUpSinceId = this.getNewestId() ?? null;
+		let cursor = this.catchUpSinceId;
+		const recovered: T[] = [];
+		const params = {
+			...(typeof this.params === 'function' ? this.params() : this.params),
+			...(this.computedParams ? this.computedParams.value : {}),
+		};
+		this.fetchingNewer.value = true;
+
+		try {
+			for (;;) {
+				const data: E['req'] = {
+					...params,
+					limit: SECOND_FETCH_LIMIT,
+					...(cursor == null ? {} : { sinceId: cursor }),
+				};
+				const page = await misskeyApi<T[]>(this.endpoint, data);
+				if (generation !== this.catchUpGeneration || options.signal?.aborted) return;
+				if (page.length === 0) break;
+				recovered.push(...page);
+				// An empty view has no replay boundary; load its latest page and allow older paging.
+				if (cursor == null) {
+					this.canFetchOlder.value = true;
+					break;
+				}
+				const nextCursor = page.reduce((newest, item) => item.id > newest ? item.id : newest, cursor);
+				if (nextCursor === cursor) throw new Error('Timeline recovery cursor did not advance');
+				cursor = nextCursor;
+			}
+
+			if (typeof options.toQueue === 'function' ? options.toQueue() : options.toQueue) {
+				const visibleIds = new Set(this.items.value.map(item => item.id));
+				this.aheadQueue = [...new Map([...recovered, ...this.aheadQueue]
+					.filter(item => !visibleIds.has(item.id))
+					.map(item => [item.id, item])).values()]
+					.sort((a, b) => a.id > b.id ? -1 : a.id < b.id ? 1 : 0)
+					.slice(0, MAX_QUEUE_ITEMS);
+				this.queuedAheadItemsCount.value = this.aheadQueue.length;
+			} else {
+				const items = [...new Map([...recovered, ...this.items.value].map(item => [item.id, item])).values()];
+				items.sort((a, b) => a.id > b.id ? -1 : a.id < b.id ? 1 : 0);
+				this.items.value = this.order.value === 'oldest' ? items.reverse() : items;
+			}
+			this.catchUpSinceId = undefined;
+			this.error.value = false;
+		} catch {
+			if (generation === this.catchUpGeneration && !options.signal?.aborted) this.error.value = true;
+		} finally {
+			if (generation === this.catchUpGeneration) this.fetchingNewer.value = false;
+		}
 	}
 
 	public trim(trigger = true): void {

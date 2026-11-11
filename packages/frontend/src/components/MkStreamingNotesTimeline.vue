@@ -78,6 +78,7 @@ import { DI } from '@/di.js';
 import { globalEvents, useGlobalEvent } from '@/events.js';
 import { isSeparatorNeeded, getSeparatorInfo } from '@/utility/timeline-date-separate.js';
 import { Paginator } from '@/utility/paginator.js';
+import { useStreamReconnect } from '@/composables/use-stream-reconnect.js';
 
 const props = withDefaults(defineProps<{
 	src: BasicTimelineType | 'mentions' | 'directs' | 'list' | 'antenna' | 'channel' | 'role';
@@ -398,6 +399,9 @@ function disconnectChannel() {
 
 if (store.s.realtimeMode) {
 	connectChannel();
+	useStreamReconnect((signal) => {
+		void paginator.catchUp({ toQueue: () => !isTop() || isPausingUpdate, signal });
+	});
 }
 
 watch(() => [props.list, props.antenna, props.channel, props.role, props.withRenotes], () => {

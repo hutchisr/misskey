@@ -139,6 +139,14 @@ const showIndicator = ref(false);
 const timelineEl = useTemplateRef('timelineEl');
 const timeline = makeDateSeparatedTimelineComputedRef(messages);
 
+const stream = useStream();
+let isActivated = true;
+let disposed = false;
+let recoveryGeneration = 0;
+let recovering = false;
+let needsRecovery = true;
+let recoverySinceId: string | undefined;
+
 const SCROLL_HEAD_THRESHOLD = 200;
 
 // column-reverseなので本来はスクロール位置の最下部への追従は不要なはずだが、おそらくブラウザのバグにより、最下部にスクロールした状態でも追従されない場合がある(スクロール位置が少数になることがあるのが関わっていそう)
@@ -169,128 +177,173 @@ function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.en
 	};
 }
 
-async function initialize() {
-	const LIMIT = 20;
-
-	if (initializing.value) return;
-
-	initializing.value = true;
-	initialized.value = false;
-
-	if (props.userId) {
-		const [u, m] = await Promise.all([
-			misskeyApi('users/show', { userId: props.userId }),
-			misskeyApi('chat/messages/user-timeline', { userId: props.userId, limit: LIMIT }),
-		]);
-
-		user.value = u;
-		messages.value = m.map(x => normalizeMessage(x));
-
-		if (messages.value.length === LIMIT) {
-			canFetchMore.value = true;
-		}
-
-		connection.value = useStream().useChannel('chatUser', {
-			otherId: user.value.id,
-		});
-		connection.value.on('message', onMessage);
-		connection.value.on('deleted', onDeleted);
-		connection.value.on('react', onReact);
-		connection.value.on('unreact', onUnreact);
-	} else if (props.roomId) {
-		const [rResult, mResult] = await Promise.allSettled([
-			misskeyApi('chat/rooms/show', { roomId: props.roomId }),
-			misskeyApi('chat/messages/room-timeline', { roomId: props.roomId, limit: LIMIT }),
-		]);
-
-		if (rResult.status === 'rejected') {
-			os.alert({
-				type: 'error',
-				text: i18n.ts.somethingHappened,
-			});
-			initializing.value = false;
-			return;
-		}
-
-		const r = rResult.value as Misskey.entities.ChatRoomsShowResponse;
-
-		if (r.invitationExists) {
-			const confirm = await os.confirm({
-				type: 'question',
-				title: r.name,
-				text: i18n.ts._chat.youAreNotAMemberOfThisRoomButInvited + '\n' + i18n.ts._chat.doYouAcceptInvitation,
-			});
-			if (confirm.canceled) {
-				initializing.value = false;
-				router.push('/chat');
-				return;
-			} else {
-				await os.apiWithDialog('chat/rooms/join', { roomId: r.id });
-				initializing.value = false;
-				initialize();
-				return;
-			}
-		}
-
-		const m = mResult.status === 'fulfilled' ? mResult.value as Misskey.entities.ChatMessagesRoomTimelineResponse : [];
-
-		room.value = r;
-		messages.value = m.map(x => normalizeMessage(x));
-
-		if (messages.value.length === LIMIT) {
-			canFetchMore.value = true;
-		}
-
-		connection.value = useStream().useChannel('chatRoom', {
-			roomId: room.value.id,
-		});
-		connection.value.on('message', onMessage);
-		connection.value.on('deleted', onDeleted);
-		connection.value.on('react', onReact);
-		connection.value.on('unreact', onUnreact);
+function mergeMessages(incoming: (Misskey.entities.ChatMessageLite | Misskey.entities.ChatMessage)[]) {
+	const ids = new Set(messages.value.map(message => message.id));
+	for (const message of incoming) {
+		if (ids.has(message.id)) continue;
+		ids.add(message.id);
+		messages.value.push(normalizeMessage(message));
 	}
-
-	window.document.addEventListener('visibilitychange', onVisibilitychange);
-
-	initialized.value = true;
-	initializing.value = false;
+	messages.value.sort((a, b) => a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 }
 
-let isActivated = true;
+function fetchMessages(params: { limit: number; sinceId?: string; untilId?: string }) {
+	return props.userId
+		? misskeyApi('chat/messages/user-timeline', { userId: props.userId, ...params })
+		: misskeyApi('chat/messages/room-timeline', { roomId: props.roomId!, ...params });
+}
+
+async function initialize() {
+	const LIMIT = 20;
+	if (initializing.value || initialized.value || disposed) return;
+	initializing.value = true;
+
+	try {
+		if (props.userId) {
+			const [u, m] = await Promise.all([
+				misskeyApi('users/show', { userId: props.userId }),
+				fetchMessages({ limit: LIMIT }),
+			]);
+			if (disposed) return;
+			user.value = u;
+			mergeMessages(m);
+			canFetchMore.value = m.length === LIMIT;
+			connection.value = stream.useChannel('chatUser', { otherId: u.id });
+		} else if (props.roomId) {
+			const [rResult, mResult] = await Promise.allSettled([
+				misskeyApi('chat/rooms/show', { roomId: props.roomId }),
+				fetchMessages({ limit: LIMIT }),
+			]);
+			if (disposed) return;
+			if (rResult.status === 'rejected') throw rResult.reason;
+			const r = rResult.value;
+
+			if (r.invitationExists) {
+				const confirm = await os.confirm({
+					type: 'question',
+					title: r.name,
+					text: i18n.ts._chat.youAreNotAMemberOfThisRoomButInvited + '\n' + i18n.ts._chat.doYouAcceptInvitation,
+				});
+				if (disposed) return;
+				if (confirm.canceled) {
+					router.push('/chat');
+				} else {
+					await misskeyApi('chat/rooms/join', { roomId: r.id });
+					initializing.value = false;
+					await initialize();
+				}
+				return;
+			}
+
+			if (mResult.status === 'rejected') throw mResult.reason;
+			room.value = r;
+			mergeMessages(mResult.value);
+			canFetchMore.value = mResult.value.length === LIMIT;
+			connection.value = stream.useChannel('chatRoom', { roomId: r.id });
+		}
+
+		connection.value?.on('message', onMessage);
+		connection.value?.on('deleted', onDeleted);
+		connection.value?.on('react', onReact);
+		connection.value?.on('unreact', onUnreact);
+		recoverySinceId = messages.value[0]?.id;
+		window.document.addEventListener('visibilitychange', onVisibilitychange);
+		initialized.value = true;
+		// Close the gap between the initial HTTP snapshot and channel subscription.
+		scheduleRecovery();
+	} catch {
+		if (!disposed) os.alert({ type: 'error', text: i18n.ts.somethingHappened });
+	} finally {
+		initializing.value = false;
+	}
+}
+
+function interruptRecovery() {
+	needsRecovery = true;
+	recoveryGeneration++;
+}
+
+function scheduleRecovery() {
+	// The SDK resubscribes channels after emitting _connected_.
+	queueMicrotask(() => {
+		void recoverMessages();
+	});
+}
+
+async function recoverMessages() {
+	if (disposed || !isActivated || !initialized.value || stream.state !== 'connected' || recovering || !needsRecovery) return;
+	const generation = recoveryGeneration;
+	const LIMIT = 100;
+	// Live messages may be newer than the gap. Only HTTP pages advance this cursor.
+	let sinceId = recoverySinceId;
+	let untilId: string | undefined;
+	const forwards = sinceId != null;
+	recovering = true;
+
+	try {
+		while (true) {
+			const page = await fetchMessages({ limit: LIMIT, sinceId, untilId });
+			if (generation !== recoveryGeneration) return;
+			mergeMessages(page);
+			if (page.length < LIMIT) break;
+			// sinceId is ascending; an initially empty chat is paged backwards.
+			if (forwards) {
+				sinceId = page[page.length - 1].id;
+			} else {
+				untilId = page[page.length - 1].id;
+			}
+		}
+		recoverySinceId = messages.value[0]?.id;
+		needsRecovery = false;
+	} catch {
+		if (generation === recoveryGeneration) {
+			os.alert({ type: 'error', text: i18n.ts.somethingHappened });
+		}
+	} finally {
+		recovering = false;
+		if (generation !== recoveryGeneration) scheduleRecovery();
+	}
+}
+
+stream.on('_disconnected_', interruptRecovery);
+stream.on('_connected_', scheduleRecovery);
 
 onActivated(() => {
 	isActivated = true;
+	if (initialized.value) scheduleRecovery();
+	else void initialize();
 });
 
 onDeactivated(() => {
 	isActivated = false;
+	interruptRecovery();
 });
 
 async function fetchMore() {
 	const LIMIT = 30;
-
+	if (moreFetching.value || messages.value.length === 0) return;
 	moreFetching.value = true;
 
-	const newMessages = props.userId ? await misskeyApi('chat/messages/user-timeline', {
-		userId: user.value!.id,
-		limit: LIMIT,
-		untilId: messages.value[messages.value.length - 1].id,
-	}) : await misskeyApi('chat/messages/room-timeline', {
-		roomId: room.value!.id,
-		limit: LIMIT,
-		untilId: messages.value[messages.value.length - 1].id,
-	});
-
-	messages.value.push(...newMessages.map(x => normalizeMessage(x)));
-
-	canFetchMore.value = newMessages.length === LIMIT;
-	moreFetching.value = false;
+	try {
+		const newMessages = await fetchMessages({
+			limit: LIMIT,
+			untilId: messages.value[messages.value.length - 1].id,
+		});
+		if (disposed) return;
+		mergeMessages(newMessages);
+		canFetchMore.value = newMessages.length === LIMIT;
+	} catch {
+		if (!disposed) os.alert({ type: 'error', text: i18n.ts.somethingHappened });
+	} finally {
+		moreFetching.value = false;
+	}
 }
 
 function onMessage(message: Misskey.entities.ChatMessageLite) {
+	if (messages.value.some(existing => existing.id === message.id)) return;
 	sound.playMisskeySfx('chatMessage');
-
-	messages.value.unshift(normalizeMessage(message));
+	mergeMessages([message]);
+	if (!needsRecovery) recoverySinceId = messages.value[0]?.id;
 
 	// TODO: DOM的にバックグラウンドになっていないかどうかも考慮する
 	if (message.fromUserId !== $i.id && !window.document.hidden && isActivated) {
@@ -355,13 +408,11 @@ onMounted(() => {
 	initialize();
 });
 
-onActivated(() => {
-	if (!initialized.value) {
-		initialize();
-	}
-});
-
 onBeforeUnmount(() => {
+	disposed = true;
+	interruptRecovery();
+	stream.off('_disconnected_', interruptRecovery);
+	stream.off('_connected_', scheduleRecovery);
 	connection.value?.dispose();
 	window.document.removeEventListener('visibilitychange', onVisibilitychange);
 });

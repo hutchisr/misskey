@@ -57,6 +57,7 @@ import { prefer } from '@/preferences.js';
 import { store } from '@/store.js';
 import { isSeparatorNeeded, getSeparatorInfo } from '@/utility/timeline-date-separate.js';
 import { Paginator } from '@/utility/paginator.js';
+import { useStreamReconnect } from '@/composables/use-stream-reconnect.js';
 
 const props = defineProps<{
 	excludeTypes?: typeof notificationTypes[number][] | null;
@@ -91,6 +92,12 @@ if (!store.s.realtimeMode) {
 	}, POLLING_INTERVAL, {
 		immediate: false,
 		afterMounted: true,
+	});
+}
+
+if (store.s.realtimeMode) {
+	useStreamReconnect((signal) => {
+		void paginator.catchUp({ toQueue: () => !isTop() || isPausingUpdate, signal });
 	});
 }
 
